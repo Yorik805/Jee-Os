@@ -81,6 +81,50 @@ const normalizeChapter = (chapter: Chapter): Chapter => ({
   step3Sections: chapter.step3Sections ?? {}
 })
 
+// Recalculate chapter done counts from progress logs to ensure consistency
+const recalculateChapterProgress = (data: AppData): AppData => {
+  const recalculated = { ...data }
+  const chaptersBySubject = { ...data.subjects }
+  
+  // Reset all done counts first
+  ;(['Physics', 'Chemistry', 'Mathematics'] as Subject[]).forEach(subject => {
+    chaptersBySubject[subject] = chaptersBySubject[subject].map(ch => ({
+      ...ch,
+      exerciseDone: 0,
+      step2Done: 0,
+      step3Done: 0,
+      doubts: [],
+      revisionCount: 0,
+      lastTouched: ''
+    }))
+  })
+  
+  // Recalculate from logs
+  data.progressLogs.forEach(log => {
+    const chapters = [...chaptersBySubject[log.subject]]
+    const idx = chapters.findIndex(c => c.name === log.chapter)
+    if (idx >= 0) {
+      const ch = { ...chapters[idx] }
+      if (log.type === 'Exercise') {
+        ch.exerciseDone = Math.min(ch.exerciseTotal, ch.exerciseDone + log.solved)
+      } else if (log.type === 'Step 2') {
+        ch.step2Done = Math.min(ch.step2Total, ch.step2Done + log.solved)
+      } else if (log.type === 'Step 3') {
+        const step3Solved = log.step3Question ?? log.solved
+        ch.step3Done = Math.min(ch.step3Total, ch.step3Done + step3Solved)
+      }
+      ch.doubts = [...ch.doubts, ...log.doubtList]
+      ch.revisionCount = log.flagged ? ch.revisionCount + 1 : ch.revisionCount
+      ch.lastTouched = log.date
+      chapters[idx] = ch
+    }
+    chaptersBySubject[log.subject] = chapters
+  })
+  
+  recalculated.subjects = chaptersBySubject
+  return recalculated
+}
+
 const normalizeData = (raw: Partial<AppData>): AppData => ({
   ...initialData,
   ...raw,
@@ -142,10 +186,11 @@ export default function JeeOSPage() {
         const userDocRef = doc(db, COLLECTION_NAME, user.uid)
         const docSnap = await getDoc(userDocRef)
         
-        if (docSnap.exists()) {
-          const storedData = docSnap.data().data as AppData
-          setData(normalizeData(storedData))
-        } else {
+if (docSnap.exists()) {
+           const storedData = docSnap.data().data as AppData
+           const normalized = normalizeData(storedData)
+           setData(recalculateChapterProgress(normalized))
+         } else {
           // First time user, create empty document
           await setDoc(userDocRef, {
             data: initialData,
@@ -180,10 +225,46 @@ export default function JeeOSPage() {
       } catch (error) {
         console.error('Error saving to Firestore:', error)
       }
-    }, 500) // Debounce for 500ms
+    }, 100) // Shorter debounce for more responsive saves
 
     return () => clearTimeout(timeoutId)
   }, [data, isLoaded, user, firebaseEnabled])
+
+  // Flush Firestore save on page unload/visibility change
+  useEffect(() => {
+    if (!firebaseEnabled || !user) return
+
+    const flushSave = async () => {
+      try {
+        const userDocRef = doc(db, COLLECTION_NAME, user.uid)
+        await setDoc(userDocRef, {
+          data,
+          lastSyncedAt: serverTimestamp(),
+          version: 1,
+        }, { merge: true })
+      } catch (error) {
+        console.error('Error flushing save on unload:', error)
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushSave()
+      }
+    }
+
+    const handleBeforeUnload = () => {
+      flushSave()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [data, firebaseEnabled, user])
 
   const showToast = useCallback((message: string) => {
     setToast({ message, show: true })
@@ -420,17 +501,18 @@ export default function JeeOSPage() {
     try {
       const imported = JSON.parse(jsonData)
       const normalizedImported = normalizeData(imported)
-      setData(normalizedImported)
+      const recalculated = recalculateChapterProgress(normalizedImported)
+      setData(recalculated)
       
-      // Immediately save to Firestore
-      if (user && firebaseEnabled) {
-        try {
-          const userDocRef = doc(db, COLLECTION_NAME, user.uid)
-          await setDoc(userDocRef, {
-            data: normalizedImported,
-            lastSyncedAt: serverTimestamp(),
-            version: 1,
-          }, { merge: true })
+// Immediately save to Firestore
+       if (user && firebaseEnabled) {
+         try {
+           const userDocRef = doc(db, COLLECTION_NAME, user.uid)
+           await setDoc(userDocRef, {
+             data: recalculated,
+             lastSyncedAt: serverTimestamp(),
+             version: 1,
+           }, { merge: true })
           showToast('Data imported and saved to cloud!')
         } catch (error) {
           console.error('Error saving imported data:', error)

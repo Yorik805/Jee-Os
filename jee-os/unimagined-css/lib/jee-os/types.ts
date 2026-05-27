@@ -66,6 +66,12 @@ export interface DoubtLog {
   note: string
 }
 
+export interface DailySummary {
+  id: string
+  date: string
+  summary: string
+}
+
 export interface SchoolProgress {
   chapter: string
   index: number
@@ -86,6 +92,7 @@ export interface AppData {
   tipLogs: TipLog[]
   noteLogs: NoteLog[]
   doubtLogs: DoubtLog[]
+  dailySummaries: DailySummary[]
   schoolProgress: Record<Subject, SchoolProgress>
   dailyGoal: number
   streakData: StreakData

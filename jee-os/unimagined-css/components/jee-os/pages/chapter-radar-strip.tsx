@@ -168,7 +168,9 @@ function ChapterRail({ subject, chapters, excludeStep3 }: { subject: Subject; ch
           const exProgress  = chapter.exerciseTotal > 0 ? Math.round((chapter.exerciseDone / chapter.exerciseTotal) * 100) : 0
           const s2Progress  = chapter.step2Total > 0 ? Math.round((chapter.step2Done / chapter.step2Total) * 100) : 0
           const s3Progress  = chapter.step3Total > 0 ? Math.round((chapter.step3Done / chapter.step3Total) * 100) : 0
-          const overall     = Math.round((exProgress + s2Progress + s3Progress) / 3)
+          const overall = excludeStep3
+            ? (exProgress + s2Progress) > 0 ? Math.round((exProgress + s2Progress) / 2) : 0
+            : (exProgress + s2Progress + s3Progress) > 0 ? Math.round((exProgress + s2Progress + s3Progress) / 3) : 0
           const notes       = Math.max(0, Math.min(100, chapter.notesProgress || 0))
           const needsAttn   = chapter.revisionCount > 0 || chapter.doubts.length > 0
           const isActive    = abs === 0
@@ -346,9 +348,9 @@ export function ChapterRadarStrip({ data }: ChapterRadarStripProps) {
             <span>Drag or scroll to navigate</span>
           </div>
         </div>
-        <div className="space-y-7">
-          {subjects.map(s => <ChapterRail key={s} subject={s} chapters={data.subjects[s]} />)}
-        </div>
+<div className="space-y-7">
+           {subjects.map(s => <ChapterRail key={s} subject={s} chapters={data.subjects[s]} excludeStep3={data.settings?.excludeStep3FromCalculations} />)}
+         </div>
       </section>
 
       {/* Subject Averages Chart */}

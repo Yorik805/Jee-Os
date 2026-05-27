@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState } from 'react'
-import { BookOpen, Plus, Clock, AlertTriangle, Check } from 'lucide-react'
+import { BookOpen, Plus, Clock, AlertTriangle, Check, Edit2, Trash2 } from 'lucide-react'
 import type { AppData, DoubtLog, ProgressLog, Subject, TipLog, NoteLog } from '@/lib/jee-os/types'
 
 interface TrackerPageProps {
@@ -10,6 +10,14 @@ interface TrackerPageProps {
   addTipLog: (tip: TipLog) => boolean
   addNoteLog: (note: NoteLog) => boolean
   addDoubtLog: (doubt: DoubtLog) => boolean
+  updateProgressLog?: (log: ProgressLog) => void
+  deleteProgressLog?: (logId: string) => void
+  updateTipLog?: (tip: TipLog) => void
+  deleteTipLog?: (tipId: string) => void
+  updateNoteLog?: (note: NoteLog) => void
+  deleteNoteLog?: (noteId: string) => void
+  updateDoubtLog?: (doubt: DoubtLog) => void
+  deleteDoubtLog?: (doubtId: string) => void
 }
 
 export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubtLog }: TrackerPageProps) {
