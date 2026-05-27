@@ -12,9 +12,13 @@ import { Toast } from '@/components/jee-os/toast'
 import { useAuth } from '@/components/auth-provider'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db, logout } from '@/lib/firebase'
-import type { AppData, Chapter, ProgressLog, Subject, TipLog, NoteLog } from '@/lib/jee-os/types'
+import type { AppData, AppSettings, Chapter, DoubtLog, NoteLog, ProgressLog, Subject, TipLog } from '@/lib/jee-os/types'
 
 const COLLECTION_NAME = 'user-data'
+
+const initialSettings: AppSettings = {
+  excludeStep3FromCalculations: false
+}
 
 const initialData: AppData = {
   subjects: {
@@ -25,6 +29,7 @@ const initialData: AppData = {
   progressLogs: [],
   tipLogs: [],
   noteLogs: [],
+  doubtLogs: [],
   schoolProgress: {
     Physics: { chapter: '', index: 0 },
     Chemistry: { chapter: '', index: 0 },
@@ -34,7 +39,24 @@ const initialData: AppData = {
   streakData: {
     current: 0,
     lastDate: ''
-  }
+  },
+  settings: initialSettings
+}
+
+const initialChapter: Chapter = {
+  name: '',
+  notes: '',
+  exerciseTotal: 0,
+  step2Total: 0,
+  step3Total: 0,
+  step3Sections: {},
+  exerciseDone: 0,
+  step2Done: 0,
+  step3Done: 0,
+  notesProgress: 0,
+  revisionCount: 0,
+  lastTouched: '',
+  doubts: []
 }
 
 const parseDoubts = (text: string, start: number, end: number): number[] => {
@@ -55,7 +77,8 @@ const normalizeChapter = (chapter: Chapter): Chapter => ({
   notesProgress: chapter.notesProgress ?? 0,
   revisionCount: chapter.revisionCount ?? 0,
   lastTouched: chapter.lastTouched ?? '',
-  doubts: chapter.doubts ?? []
+  doubts: chapter.doubts ?? [],
+  step3Sections: chapter.step3Sections ?? {}
 })
 
 const normalizeData = (raw: Partial<AppData>): AppData => ({
@@ -74,7 +97,12 @@ const normalizeData = (raw: Partial<AppData>): AppData => ({
     doubtList: log.doubtList ?? parseDoubts(log.doubts ?? '', log.rangeStart, log.rangeEnd)
   })),
   tipLogs: raw.tipLogs ?? [],
-  noteLogs: raw.noteLogs ?? []
+  noteLogs: raw.noteLogs ?? [],
+  doubtLogs: raw.doubtLogs ?? [],
+  settings: {
+    ...initialSettings,
+    ...(raw.settings || {})
+  }
 })
 
 export default function JeeOSPage() {
@@ -182,6 +210,47 @@ export default function JeeOSPage() {
     showToast(`Chapter "${chapter.name}" added to ${subject}`)
   }, [showToast])
 
+  const editChapter = useCallback((subject: Subject, oldName: string, updatedChapter: Chapter) => {
+    setData(prev => {
+      const subjectChapters = [...prev.subjects[subject]]
+      const idx = subjectChapters.findIndex(c => c.name === oldName)
+      if (idx >= 0) {
+        subjectChapters[idx] = updatedChapter
+      }
+      return {
+        ...prev,
+        subjects: {
+          ...prev.subjects,
+          [subject]: subjectChapters
+        }
+      }
+    })
+    showToast(`Chapter updated`)
+  }, [showToast])
+
+  const deleteChapter = useCallback((subject: Subject, chapterName: string) => {
+    setData(prev => ({
+      ...prev,
+      subjects: {
+        ...prev.subjects,
+        [subject]: prev.subjects[subject].filter(c => c.name !== chapterName)
+      },
+      progressLogs: prev.progressLogs.filter(l => !(l.subject === subject && l.chapter === chapterName))
+    }))
+    showToast(`Chapter "${chapterName}" deleted`)
+  }, [showToast])
+
+  const toggleExcludeStep3 = useCallback((exclude: boolean) => {
+    setData(prev => ({
+      ...prev,
+      settings: {
+        ...(prev.settings || initialSettings),
+        excludeStep3FromCalculations: exclude
+      }
+    }))
+    showToast(exclude ? 'Step 3 excluded from calculations' : 'Step 3 included in calculations')
+  }, [showToast])
+
   const logProgress = useCallback((log: ProgressLog) => {
     if (!log.chapter) {
       showToast('Please select a chapter')
@@ -229,8 +298,17 @@ export default function JeeOSPage() {
           chapter.exerciseDone = Math.min(chapter.exerciseTotal, chapter.exerciseDone + normalizedLog.solved)
         } else if (normalizedLog.type === 'Step 2') {
           chapter.step2Done = Math.min(chapter.step2Total, chapter.step2Done + normalizedLog.solved)
-        } else {
-          chapter.step3Done = Math.min(chapter.step3Total, chapter.step3Done + normalizedLog.solved)
+        } else if (normalizedLog.type === 'Step 3') {
+          // For Step 3: use the original solved value (log.step3Question), not the adjusted one
+          const step3Solved = normalizedLog.step3Question ?? normalizedLog.solved
+          chapter.step3Done = Math.min(chapter.step3Total, chapter.step3Done + step3Solved)
+          // Update section totals if available
+          if (normalizedLog.step3Section) {
+            chapter.step3Sections = { ...(chapter.step3Sections || {}) }
+            if (normalizedLog.step3TotalInSection) {
+              chapter.step3Sections[normalizedLog.step3Section] = normalizedLog.step3TotalInSection
+            }
+          }
         }
         chapter.doubts = [...chapter.doubts, ...normalizedLog.doubtList]
         chapter.revisionCount = normalizedLog.flagged ? chapter.revisionCount + 1 : chapter.revisionCount
@@ -298,6 +376,19 @@ export default function JeeOSPage() {
     return true
   }, [showToast])
 
+  const addDoubtLog = useCallback((doubt: DoubtLog) => {
+    if (!doubt.chapter) {
+      showToast('Please select a chapter for doubt log')
+      return false
+    }
+    setData(prev => ({
+      ...prev,
+      doubtLogs: [doubt, ...prev.doubtLogs]
+    }))
+    showToast(doubt.resolved ? 'Hard question logged' : 'Doubt logged')
+    return true
+  }, [showToast])
+
   const updateSchoolProgress = useCallback((subject: Subject, chapter: string, index: number) => {
     setData(prev => ({
       ...prev,
@@ -340,12 +431,14 @@ export default function JeeOSPage() {
             lastSyncedAt: serverTimestamp(),
             version: 1,
           }, { merge: true })
+          showToast('Data imported and saved to cloud!')
         } catch (error) {
           console.error('Error saving imported data:', error)
+          showToast('Data imported locally, but cloud save failed')
         }
+      } else {
+        showToast('Data imported (local only)')
       }
-      
-      showToast('Data imported and saved to cloud!')
     } catch {
       showToast('Failed to import data. Invalid JSON.')
     }
@@ -375,7 +468,9 @@ export default function JeeOSPage() {
 
   // Calculate analytics
   const analytics = {
-    totalQuestions: data.progressLogs.reduce((sum, log) => sum + log.solved, 0),
+    totalQuestions: data.settings?.excludeStep3FromCalculations 
+      ? data.progressLogs.filter(log => log.type !== 'Step 3').reduce((sum, log) => sum + log.solved, 0)
+      : data.progressLogs.reduce((sum, log) => sum + log.solved, 0),
     todayQuestions: data.progressLogs
       .filter(log => log.date === new Date().toISOString().split('T')[0])
       .reduce((sum, log) => sum + log.solved, 0),
@@ -391,7 +486,8 @@ export default function JeeOSPage() {
       }).length
       return { subject, totalChapters, touchedChapters }
     }),
-    flaggedForRevision: data.progressLogs.filter(log => log.flagged)
+    flaggedForRevision: data.progressLogs.filter(log => log.flagged),
+    excludeStep3: data.settings?.excludeStep3FromCalculations ?? false
   }
 
   // Show loading state
@@ -435,6 +531,7 @@ export default function JeeOSPage() {
               logProgress={logProgress}
               addTipLog={addTipLog}
               addNoteLog={addNoteLog}
+              addDoubtLog={addDoubtLog}
             />
           )}
           
@@ -443,6 +540,8 @@ export default function JeeOSPage() {
               subject="Physics"
               data={data}
               color="purple"
+              editChapter={editChapter}
+              deleteChapter={deleteChapter}
             />
           )}
           
@@ -451,6 +550,8 @@ export default function JeeOSPage() {
               subject="Chemistry"
               data={data}
               color="cyan"
+              editChapter={editChapter}
+              deleteChapter={deleteChapter}
             />
           )}
           
@@ -459,6 +560,8 @@ export default function JeeOSPage() {
               subject="Mathematics"
               data={data}
               color="pink"
+              editChapter={editChapter}
+              deleteChapter={deleteChapter}
             />
           )}
           
@@ -477,6 +580,7 @@ export default function JeeOSPage() {
               exportData={exportData}
               importData={importData}
               resetData={resetData}
+              toggleExcludeStep3={toggleExcludeStep3}
             />
           )}
         </div>

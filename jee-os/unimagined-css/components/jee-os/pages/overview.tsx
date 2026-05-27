@@ -26,7 +26,7 @@ export function OverviewPage({ data, analytics }: OverviewPageProps) {
   const chartRef = useRef<HTMLCanvasElement>(null)
   const chartInstance = useRef<Chart | null>(null)
 
-  // Calculate 7-day activity data
+  // Calculate 7-day activity data (includes all types including Step 3)
   const activityData = useMemo(() => {
     const days = []
     for (let i = 6; i >= 0; i--) {
@@ -116,9 +116,20 @@ export function OverviewPage({ data, analytics }: OverviewPageProps) {
     ? Math.min((analytics.todayQuestions / data.dailyGoal) * 100, 100) 
     : 0
 
-  const overallProgress = analytics.subjectStats.reduce((sum, s) => {
-    if (s.totalChapters === 0) return sum
-    return sum + (s.touchedChapters / s.totalChapters) * 100
+  const excludeStep3 = data.settings?.excludeStep3FromCalculations ?? false
+
+  // Calculate overall progress based on actual questions solved
+  const overallProgress = (['Physics', 'Chemistry', 'Mathematics'] as Subject[]).reduce((sum, s) => {
+    const chapters = data.subjects[s]
+    const totalPossible = chapters.reduce((t, ch) => t + ch.exerciseTotal + ch.step2Total + (excludeStep3 ? 0 : ch.step3Total), 0)
+    const totalSolved = chapters.reduce((t, ch) => {
+      const logs = data.progressLogs.filter(log => log.subject === s && log.chapter === ch.name)
+      return t + logs.reduce((s, l) => {
+        if (excludeStep3 && l.type === 'Step 3') return s
+        return s + (l.type === 'Step 3' && l.step3Question ? l.step3Question : l.solved)
+      }, 0)
+    }, 0)
+    return sum + (totalPossible > 0 ? (totalSolved / totalPossible) * 100 : 0)
   }, 0) / 3
 
   return (

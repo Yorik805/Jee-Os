@@ -73,7 +73,7 @@ function playClick(audioRef: React.MutableRefObject<AudioContext | null>, lastRe
   } catch (_) {}
 }
 
-function ChapterRail({ subject, chapters }: { subject: Subject; chapters: AppData['subjects'][Subject] }) {
+function ChapterRail({ subject, chapters, excludeStep3 }: { subject: Subject; chapters: AppData['subjects'][Subject]; excludeStep3?: boolean }) {
   const [active, setActive]   = useState(0)
   const audioRef   = useRef<AudioContext | null>(null)
   const lastRef    = useRef(0)

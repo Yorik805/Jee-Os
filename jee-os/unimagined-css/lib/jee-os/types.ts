@@ -6,6 +6,7 @@ export interface Chapter {
   exerciseTotal: number
   step2Total: number
   step3Total: number
+  step3Sections: Record<string, number>
   exerciseDone: number
   step2Done: number
   step3Done: number
@@ -31,6 +32,9 @@ export interface ProgressLog {
   doubtList: number[]
   notes: string
   flagged: boolean
+  step3Section?: string
+  step3Question?: number
+  step3TotalInSection?: number
 }
 
 export interface TipLog {
@@ -52,6 +56,16 @@ export interface NoteLog {
   noteText: string
 }
 
+export interface DoubtLog {
+  id: string
+  date: string
+  subject: Subject
+  chapter: string
+  doubtQuestion: string
+  resolved: boolean
+  note: string
+}
+
 export interface SchoolProgress {
   chapter: string
   index: number
@@ -62,14 +76,20 @@ export interface StreakData {
   lastDate: string
 }
 
+export interface AppSettings {
+  excludeStep3FromCalculations: boolean
+}
+
 export interface AppData {
   subjects: Record<Subject, Chapter[]>
   progressLogs: ProgressLog[]
   tipLogs: TipLog[]
   noteLogs: NoteLog[]
+  doubtLogs: DoubtLog[]
   schoolProgress: Record<Subject, SchoolProgress>
   dailyGoal: number
   streakData: StreakData
+  settings?: AppSettings
 }
 
 export interface Analytics {

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Settings as SettingsIcon, Plus, Target, Download, Upload, Trash2, Database } from 'lucide-react'
-import type { AppData, Chapter, Subject } from '@/lib/jee-os/types'
+import { Settings as SettingsIcon, Plus, Target, Download, Upload, Trash2, Database, ToggleLeft } from 'lucide-react'
+import type { AppData, AppSettings, Chapter, Subject } from '@/lib/jee-os/types'
 
 interface SettingsPageProps {
   data: AppData
@@ -11,6 +11,7 @@ interface SettingsPageProps {
   exportData: () => void
   importData: (json: string) => void
   resetData: () => void
+  toggleExcludeStep3: (exclude: boolean) => void
 }
 
 export function SettingsPage({ 
@@ -19,9 +20,11 @@ export function SettingsPage({
   updateDailyGoal, 
   exportData, 
   importData, 
-  resetData 
+  resetData,
+  toggleExcludeStep3
 }: SettingsPageProps) {
   const [dailyGoalInput, setDailyGoalInput] = useState(data.dailyGoal)
+  const [excludeStep3, setExcludeStep3] = useState(data.settings?.excludeStep3FromCalculations ?? false)
   const [chapterForm, setChapterForm] = useState({
     subject: 'Physics' as Subject,
     name: '',
@@ -50,6 +53,7 @@ export function SettingsPage({
       exerciseTotal: chapterForm.exerciseTotal,
       step2Total: chapterForm.step2Total,
       step3Total: chapterForm.step3Total,
+      step3Sections: {},
       exerciseDone: 0,
       step2Done: 0,
       step3Done: 0,
@@ -124,6 +128,45 @@ export function SettingsPage({
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Step 3 Toggle */}
+      <div className="glass-card p-6 animate-entrance animate-entrance-1-5">
+        <div className="flex items-center gap-2 mb-6">
+          <ToggleLeft className="w-4 h-4 text-[var(--neon-amber)]" />
+          <span className="text-sm font-semibold text-[var(--text-primary)]">Step 3 Calculations</span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-[var(--text-primary)]">
+              {excludeStep3 ? 'Step 3: EXCLUDED' : 'Step 3: INCLUDED'}
+            </span>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">
+              {excludeStep3 
+                ? "Step 3 questions excluded from totals and percentages"
+                : "Step 3 questions included in progress calculations"
+              }
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const newState = !excludeStep3
+              setExcludeStep3(newState)
+              toggleExcludeStep3?.(newState)
+            }}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              excludeStep3 ? 'bg-[var(--neon-purple)]' : 'bg-[var(--neon-green)]'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                excludeStep3 ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Add Chapter */}

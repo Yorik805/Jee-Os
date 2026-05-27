@@ -1,27 +1,29 @@
 ﻿'use client'
 
 import { useState } from 'react'
-import { BookOpen, Plus, Clock, AlertTriangle } from 'lucide-react'
-import type { AppData, ProgressLog, Subject, TipLog, NoteLog } from '@/lib/jee-os/types'
+import { BookOpen, Plus, Clock, AlertTriangle, Check } from 'lucide-react'
+import type { AppData, DoubtLog, ProgressLog, Subject, TipLog, NoteLog } from '@/lib/jee-os/types'
 
 interface TrackerPageProps {
   data: AppData
   logProgress: (log: ProgressLog) => boolean
   addTipLog: (tip: TipLog) => boolean
   addNoteLog: (note: NoteLog) => boolean
+  addDoubtLog: (doubt: DoubtLog) => boolean
 }
 
-export function TrackerPage({ data, logProgress, addTipLog, addNoteLog }: TrackerPageProps) {
+export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubtLog }: TrackerPageProps) {
   const [formData, setFormData] = useState({
     subject: 'Physics' as Subject,
     chapter: '',
     type: 'Exercise' as 'Exercise' | 'Step 2' | 'Step 3',
     rangeStart: 1,
     rangeEnd: 10,
-    solved: 0,
     doubts: '',
     notes: '',
-    flagged: false
+    flagged: false,
+    step3Section: '',
+    step3TotalInSection: 0
   })
   const [tipData, setTipData] = useState({
     subject: 'Physics' as Subject,
@@ -36,31 +38,78 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog }: Tracke
     notesProgress: 0,
     noteText: ''
   })
+  const [doubtLogData, setDoubtLogData] = useState({
+    subject: 'Physics' as Subject,
+    chapter: '',
+    doubtQuestion: '',
+    resolved: false,
+    note: ''
+  })
 
   const chapters = data.subjects[formData.subject]
   const tipChapters = data.subjects[tipData.subject]
   const noteChapters = data.subjects[noteData.subject]
+  const doubtLogChapters = data.subjects[doubtLogData.subject]
+
+  const parseDoubts = (text: string): number[] => {
+    if (!text.trim()) return []
+    return [...new Set(
+      text
+        .split(',')
+        .map(v => Number(v.trim()))
+        .filter(n => Number.isInteger(n))
+    )]
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
     const attempted = formData.rangeEnd - formData.rangeStart + 1
+    const doubtList = parseDoubts(formData.doubts)
+    // Auto-calculate solved: range size minus doubts
+    const solved = attempted - doubtList.length
+
+    // For Step 3: calculate the adjusted question number based on sections
+    const chapter = data.subjects[formData.subject].find(c => c.name === formData.chapter)
+    const existingSections = chapter?.step3Sections || {}
+
+    let adjustedSolved = solved
+    let adjustedRangeStart = formData.rangeStart
+    let adjustedRangeEnd = formData.rangeEnd
+
+    // If this is Step 3 and we have section info
+    if (formData.type === 'Step 3' && formData.step3Section && chapter) {
+      const sectionLetters = 'abcde'
+      let previousTotal = 0
+      for (let i = 0; i < sectionLetters.indexOf(formData.step3Section.toLowerCase()); i++) {
+        const sec = sectionLetters[i]
+        previousTotal += existingSections[sec] || 0
+      }
+
+      adjustedSolved = previousTotal + solved
+      adjustedRangeStart = previousTotal + formData.rangeStart
+      adjustedRangeEnd = previousTotal + formData.rangeEnd
+    }
+
     const log: ProgressLog = {
       id: Date.now().toString(),
       date: new Date().toISOString().split('T')[0],
       subject: formData.subject,
       chapter: formData.chapter,
       type: formData.type,
-      rangeStart: formData.rangeStart,
-      rangeEnd: formData.rangeEnd,
-      solved: formData.solved,
-      correct: Math.max(0, formData.solved),
+      rangeStart: adjustedRangeStart,
+      rangeEnd: adjustedRangeEnd,
+      solved: adjustedSolved,
+      correct: solved,
       attempted,
-      left: Math.max(0, attempted - formData.solved),
+      left: doubtList.length,
       doubts: formData.doubts,
-      doubtList: [],
+      doubtList: doubtList,
       notes: formData.notes,
-      flagged: formData.flagged
+      flagged: formData.flagged || doubtList.length > 0,
+      step3Section: formData.type === 'Step 3' ? formData.step3Section : undefined,
+      step3Question: formData.type === 'Step 3' ? solved : undefined,
+      step3TotalInSection: formData.type === 'Step 3' ? formData.step3TotalInSection : undefined
     }
 
     const ok = logProgress(log)
@@ -70,10 +119,11 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog }: Tracke
       ...prev,
       rangeStart: prev.rangeEnd + 1,
       rangeEnd: prev.rangeEnd + 10,
-      solved: 0,
       doubts: '',
       notes: '',
-      flagged: false
+      flagged: false,
+      step3Section: '',
+      step3TotalInSection: 0
     }))
   }
 
@@ -108,6 +158,22 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog }: Tracke
     setNoteData(prev => ({ ...prev, notesProgress: 0, noteText: '' }))
   }
 
+  const handleDoubtLogSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const doubt: DoubtLog = {
+      id: Date.now().toString(),
+      date: new Date().toISOString().split('T')[0],
+      subject: doubtLogData.subject,
+      chapter: doubtLogData.chapter,
+      doubtQuestion: doubtLogData.doubtQuestion.trim(),
+      resolved: doubtLogData.resolved,
+      note: doubtLogData.note.trim()
+    }
+    const ok = addDoubtLog(doubt)
+    if (!ok) return
+    setDoubtLogData(prev => ({ ...prev, doubtQuestion: '', resolved: false, note: '' }))
+  }
+
   return (
     <div className="space-y-6 animate-entrance">
       <div className="mb-8">
@@ -122,6 +188,63 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog }: Tracke
         </div>
       </div>
 
+      {/* Progress History - moved to top with fixed height */}
+      <div className="glass-card p-6 animate-entrance animate-entrance-2">
+        <div className="flex items-center gap-2 mb-6">
+          <Clock className="w-4 h-4 text-[var(--neon-cyan)]" />
+          <span className="text-xs font-bold tracking-widest text-[var(--text-muted)] uppercase">Progress History</span>
+        </div>
+
+        {data.progressLogs.length === 0 ? (
+          <div className="text-center py-12 text-[var(--text-ghost)]">
+            <AlertTriangle className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p>No progress logged yet</p>
+            <p className="text-sm mt-1">Start logging your progress above!</p>
+          </div>
+        ) : (
+          <div className="max-h-[300px] overflow-y-auto">
+            <table className="table-void">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Subject</th>
+                  <th>Chapter</th>
+                  <th>Type</th>
+                  <th>Range</th>
+                  <th>Solved</th>
+                  <th>Left</th>
+                  <th>Doubts</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.progressLogs.map(log => (
+                  <tr key={log.id}>
+                    <td className="font-mono text-xs">{log.date}</td>
+                    <td>
+                      <span className={`tag-void ${
+                        log.subject === 'Physics' ? 'tag-purple' :
+                        log.subject === 'Chemistry' ? 'tag-cyan' : 'tag-pink'
+                      }`}>
+                        {log.subject.slice(0, 3).toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="text-[var(--text-primary)] font-medium">{log.chapter}</td>
+                    <td className="text-xs">{log.type}</td>
+                    <td className="font-mono text-xs">{log.rangeStart}-{log.rangeEnd}</td>
+                    <td className="font-mono text-[var(--neon-green)]">{log.solved}</td>
+                    <td className="font-mono text-[var(--neon-red)]">{log.left}</td>
+                    <td className="font-mono text-xs text-[var(--neon-amber)]">{log.doubts || '-'}</td>
+                    <td className="text-xs text-[var(--text-muted)] max-w-[200px] truncate">{log.notes || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Log Progress */}
       <div className="glass-card p-6 animate-entrance animate-entrance-1">
         <div className="flex items-center gap-2 mb-6">
           <Plus className="w-4 h-4 text-[var(--neon-purple)]" />
@@ -195,23 +318,50 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog }: Tracke
             </label>
 
             <label className="block">
-              <span className="text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase block mb-2">Solved</span>
+              <span className="text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase block mb-2">Attempted</span>
               <input
                 type="number"
-                min={0}
-                value={formData.solved}
-                onChange={e => setFormData(prev => ({ ...prev, solved: parseInt(e.target.value) || 0 }))}
-                className="input-void text-center font-mono"
+                min={1}
+                value={formData.rangeEnd - formData.rangeStart + 1}
+                readOnly
+                className="input-void text-center font-mono opacity-50 cursor-not-allowed"
               />
             </label>
           </div>
+
+          {formData.type === 'Step 3' && (
+            <div className="grid grid-cols-3 gap-4">
+              <label className="block">
+                <span className="text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase block mb-2">Section</span>
+                <input
+                  type="text"
+                  maxLength={1}
+                  placeholder="A"
+                  value={formData.step3Section}
+                  onChange={e => setFormData(prev => ({ ...prev, step3Section: e.target.value.toLowerCase() }))}
+                  className="input-void text-center font-mono"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase block mb-2">Total in Section</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={formData.step3TotalInSection}
+                  onChange={e => setFormData(prev => ({ ...prev, step3TotalInSection: parseInt(e.target.value) || 0 }))}
+                  className="input-void text-center font-mono"
+                />
+              </label>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="block">
               <span className="text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase block mb-2">Doubt Questions</span>
               <input
                 type="text"
-                placeholder="e.g. 8,12,19"
+                placeholder="e.g. 8,12,19 (auto-calculates solved)"
                 value={formData.doubts}
                 onChange={e => setFormData(prev => ({ ...prev, doubts: e.target.value }))}
                 className="input-void font-mono text-sm"
@@ -246,61 +396,7 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog }: Tracke
         </form>
       </div>
 
-      <div className="glass-card p-6 animate-entrance animate-entrance-2">
-        <div className="flex items-center gap-2 mb-6">
-          <Clock className="w-4 h-4 text-[var(--neon-cyan)]" />
-          <span className="text-xs font-bold tracking-widest text-[var(--text-muted)] uppercase">Progress History</span>
-        </div>
-
-        {data.progressLogs.length === 0 ? (
-          <div className="text-center py-12 text-[var(--text-ghost)]">
-            <AlertTriangle className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p>No progress logged yet</p>
-            <p className="text-sm mt-1">Start logging your progress above!</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="table-void">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Subject</th>
-                  <th>Chapter</th>
-                  <th>Type</th>
-                  <th>Range</th>
-                  <th>Solved</th>
-                  <th>Left</th>
-                  <th>Doubts</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.progressLogs.slice(0, 50).map(log => (
-                  <tr key={log.id}>
-                    <td className="font-mono text-xs">{log.date}</td>
-                    <td>
-                      <span className={`tag-void ${
-                        log.subject === 'Physics' ? 'tag-purple' :
-                        log.subject === 'Chemistry' ? 'tag-cyan' : 'tag-pink'
-                      }`}>
-                        {log.subject.slice(0, 3).toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="text-[var(--text-primary)] font-medium">{log.chapter}</td>
-                    <td className="text-xs">{log.type}</td>
-                    <td className="font-mono text-xs">{log.rangeStart}-{log.rangeEnd}</td>
-                    <td className="font-mono text-[var(--neon-green)]">{log.solved}</td>
-                    <td className="font-mono text-[var(--neon-red)]">{log.left}</td>
-                    <td className="font-mono text-xs text-[var(--neon-amber)]">{log.doubts || '-'}</td>
-                    <td className="text-xs text-[var(--text-muted)] max-w-[200px] truncate">{log.notes || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
+      {/* Tip Log */}
       <div className="glass-card p-6 animate-entrance animate-entrance-3">
         <div className="flex items-center gap-2 mb-6">
           <Plus className="w-4 h-4 text-[var(--neon-pink)]" />
@@ -390,7 +486,101 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog }: Tracke
         </div>
       </div>
 
+      {/* Doubt Log */}
       <div className="glass-card p-6 animate-entrance animate-entrance-4">
+        <div className="flex items-center gap-2 mb-6">
+          <AlertTriangle className="w-4 h-4 text-[var(--neon-amber)]" />
+          <span className="text-sm font-semibold text-[var(--text-primary)]">Doubt Log</span>
+        </div>
+
+        <form onSubmit={handleDoubtLogSubmit} className="space-y-5 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <label className="block">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase block mb-2">Subject</span>
+              <select
+                value={doubtLogData.subject}
+                onChange={e => setDoubtLogData(prev => ({ ...prev, subject: e.target.value as Subject, chapter: '' }))}
+                className="input-void select-void"
+              >
+                <option>Physics</option>
+                <option>Chemistry</option>
+                <option>Mathematics</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase block mb-2">Chapter</span>
+              <select
+                value={doubtLogData.chapter}
+                onChange={e => setDoubtLogData(prev => ({ ...prev, chapter: e.target.value }))}
+                className="input-void select-void"
+              >
+                <option value="">Select chapter...</option>
+                {doubtLogChapters.map(ch => (
+                  <option key={ch.name} value={ch.name}>{ch.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase block mb-2">Question #</span>
+              <input
+                type="text"
+                placeholder="e.g. 17"
+                value={doubtLogData.doubtQuestion}
+                onChange={e => setDoubtLogData(prev => ({ ...prev, doubtQuestion: e.target.value }))}
+                className="input-void font-mono"
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase block mb-2">Resolved?</span>
+              <select
+                value={doubtLogData.resolved ? '1' : '0'}
+                onChange={e => setDoubtLogData(prev => ({ ...prev, resolved: e.target.value === '1' }))}
+                className="input-void select-void"
+              >
+                <option value="0">No (Doubt)</option>
+                <option value="1">Yes (Hard Question)</option>
+              </select>
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase block mb-2">Note</span>
+            <input
+              type="text"
+              placeholder="Any note about this doubt..."
+              value={doubtLogData.note}
+              onChange={e => setDoubtLogData(prev => ({ ...prev, note: e.target.value }))}
+              className="input-void"
+            />
+          </label>
+
+          <button type="submit" className="btn-neon w-full md:w-auto">Save Doubt Log</button>
+        </form>
+
+        <div className="space-y-3 max-h-[280px] overflow-y-auto">
+          {'doubtLogs' in data && data.doubtLogs && data.doubtLogs.length > 0 
+            ? data.doubtLogs.slice(0, 20).map((d) => (
+              <div key={d.id} className="p-3 rounded-lg bg-[var(--void-surface)] border border-[var(--border-subtle)]">
+                <div className="flex items-center gap-2 mb-1 text-xs text-[var(--text-muted)]">
+                  <span>{d.date}</span>
+                  <span>{d.subject}</span>
+                  <span>{d.chapter}</span>
+                  <span>Q{d.doubtQuestion}</span>
+                  {d.resolved && <Check className="w-3 h-3 text-[var(--neon-green)]" />}
+                </div>
+                <div className="text-sm text-[var(--text-primary)]">{d.note || '-'}</div>
+              </div>
+            ))
+            : <p className="text-sm text-[var(--text-ghost)]">No doubt logs saved yet.</p>
+          }
+        </div>
+      </div>
+
+      {/* Note Log */}
+      <div className="glass-card p-6 animate-entrance animate-entrance-5">
         <div className="flex items-center gap-2 mb-6">
           <Plus className="w-4 h-4 text-[var(--neon-green)]" />
           <span className="text-sm font-semibold text-[var(--text-primary)]">Note Log</span>
