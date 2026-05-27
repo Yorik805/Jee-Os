@@ -412,7 +412,7 @@ export default function JeeOSPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] min-h-screen">
+    <div className="flex flex-col lg:flex-row min-h-screen">
       <Sidebar 
         activePage={activePage} 
         setActivePage={setActivePage}
@@ -420,7 +420,7 @@ export default function JeeOSPage() {
         onLogout={firebaseEnabled ? handleLogout : undefined}
       />
       
-      <main className="overflow-y-auto p-4 lg:p-6">
+      <main className="flex-1 overflow-y-auto p-4 lg:p-6 lg:h-[100dvh]">
         <div className="max-w-[1400px] mx-auto">
           {activePage === 'overview' && (
             <OverviewPage 

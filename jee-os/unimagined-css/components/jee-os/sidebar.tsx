@@ -35,7 +35,7 @@ export function Sidebar({ activePage, setActivePage, user, onLogout }: SidebarPr
   const sections = [...new Set(navItems.map(item => item.section))]
 
   return (
-    <aside className="sidebar-void flex flex-col py-6 lg:min-h-screen border-b lg:border-b-0 lg:border-r border-[var(--border-subtle)]">
+    <aside className="sidebar-void flex flex-col py-6 lg:fixed lg:left-0 lg:top-0 lg:w-[260px] border-b lg:border-b-0 lg:border-r border-[var(--border-subtle)] overflow-y-auto z-40">
       {/* Logo */}
       <div className="px-6 mb-2">
         <div className="flex items-center gap-2">
