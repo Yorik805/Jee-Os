@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/jee-os/sidebar'
 import { OverviewPage } from '@/components/jee-os/pages/overview'
 import { TrackerPage } from '@/components/jee-os/pages/tracker'
@@ -8,7 +9,12 @@ import { SubjectPage } from '@/components/jee-os/pages/subject'
 import { SchoolPage } from '@/components/jee-os/pages/school'
 import { SettingsPage } from '@/components/jee-os/pages/settings'
 import { Toast } from '@/components/jee-os/toast'
+import { useAuth } from '@/components/auth-provider'
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { db, logout } from '@/lib/firebase'
 import type { AppData, Chapter, ProgressLog, Subject, TipLog, NoteLog } from '@/lib/jee-os/types'
+
+const COLLECTION_NAME = 'user-data'
 
 const initialData: AppData = {
   subjects: {
@@ -72,36 +78,98 @@ const normalizeData = (raw: Partial<AppData>): AppData => ({
 })
 
 export default function JeeOSPage() {
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
   const [data, setData] = useState<AppData>(initialData)
   const [activePage, setActivePage] = useState('overview')
   const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false })
   const [isLoaded, setIsLoaded] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
 
-  // Load data from localStorage
+  // Check if Firebase is configured
+  const firebaseEnabled = !!(
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
+    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN &&
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+  )
+
+  // Redirect to login if not authenticated and Firebase is enabled
   useEffect(() => {
-    const stored = localStorage.getItem('jee-os-data')
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        setData(normalizeData(parsed))
-      } catch {
-        console.error('Failed to parse stored data')
+    if (firebaseEnabled && !authLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, authLoading, firebaseEnabled, router])
+
+  // Load data from Firestore when user logs in
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user) {
+        // No user, use initial data
+        setData(initialData)
+        setIsLoaded(true)
+        return
       }
-    }
-    setIsLoaded(true)
-  }, [])
 
-  // Save data to localStorage
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem('jee-os-data', JSON.stringify(data))
+      try {
+        const userDocRef = doc(db, COLLECTION_NAME, user.uid)
+        const docSnap = await getDoc(userDocRef)
+        
+        if (docSnap.exists()) {
+          const storedData = docSnap.data().data as AppData
+          setData(normalizeData(storedData))
+        } else {
+          // First time user, create empty document
+          await setDoc(userDocRef, {
+            data: initialData,
+            lastSyncedAt: serverTimestamp(),
+            version: 1,
+          })
+          setData(initialData)
+        }
+      } catch (error) {
+        console.error('Error loading data from Firestore:', error)
+        setData(initialData)
+      }
+
+      setIsLoaded(true)
     }
-  }, [data, isLoaded])
+
+    loadData()
+  }, [user])
+
+  // Save data to Firestore (debounced)
+  useEffect(() => {
+    if (!isLoaded || !user || !firebaseEnabled) return
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const userDocRef = doc(db, COLLECTION_NAME, user.uid)
+        await setDoc(userDocRef, {
+          data,
+          lastSyncedAt: serverTimestamp(),
+          version: 1,
+        }, { merge: true })
+      } catch (error) {
+        console.error('Error saving to Firestore:', error)
+      }
+    }, 500) // Debounce for 500ms
+
+    return () => clearTimeout(timeoutId)
+  }, [data, isLoaded, user, firebaseEnabled])
 
   const showToast = useCallback((message: string) => {
     setToast({ message, show: true })
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000)
   }, [])
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout()
+      router.push('/login')
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
+  }, [router])
 
   const addChapter = useCallback((subject: Subject, chapter: Chapter) => {
     setData(prev => ({
@@ -257,23 +325,53 @@ export default function JeeOSPage() {
     showToast('Data exported successfully!')
   }, [data, showToast])
 
-  const importData = useCallback((jsonData: string) => {
+  const importData = useCallback(async (jsonData: string) => {
     try {
       const imported = JSON.parse(jsonData)
-      setData(normalizeData(imported))
-      showToast('Data imported successfully!')
+      const normalizedImported = normalizeData(imported)
+      setData(normalizedImported)
+      
+      // Immediately save to Firestore
+      if (user && firebaseEnabled) {
+        try {
+          const userDocRef = doc(db, COLLECTION_NAME, user.uid)
+          await setDoc(userDocRef, {
+            data: normalizedImported,
+            lastSyncedAt: serverTimestamp(),
+            version: 1,
+          }, { merge: true })
+        } catch (error) {
+          console.error('Error saving imported data:', error)
+        }
+      }
+      
+      showToast('Data imported and saved to cloud!')
     } catch {
       showToast('Failed to import data. Invalid JSON.')
     }
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
-  const resetData = useCallback(() => {
+  const resetData = useCallback(async () => {
     if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
       setData(initialData)
-      localStorage.removeItem('jee-os-data')
+      
+      // Also reset in Firestore
+      if (user && firebaseEnabled) {
+        try {
+          const userDocRef = doc(db, COLLECTION_NAME, user.uid)
+          await setDoc(userDocRef, {
+            data: initialData,
+            lastSyncedAt: serverTimestamp(),
+            version: 1,
+          })
+        } catch (error) {
+          console.error('Error resetting data in Firestore:', error)
+        }
+      }
+      
       showToast('All data has been reset')
     }
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   // Calculate analytics
   const analytics = {
@@ -296,7 +394,8 @@ export default function JeeOSPage() {
     flaggedForRevision: data.progressLogs.filter(log => log.flagged)
   }
 
-  if (!isLoaded) {
+  // Show loading state
+  if (authLoading || !isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -307,9 +406,19 @@ export default function JeeOSPage() {
     )
   }
 
+  // If Firebase is enabled and user is not logged in, don't render (will redirect)
+  if (firebaseEnabled && !user) {
+    return null
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] min-h-screen">
-      <Sidebar activePage={activePage} setActivePage={setActivePage} />
+      <Sidebar 
+        activePage={activePage} 
+        setActivePage={setActivePage}
+        user={user}
+        onLogout={firebaseEnabled ? handleLogout : undefined}
+      />
       
       <main className="overflow-y-auto p-4 lg:p-6">
         <div className="max-w-[1400px] mx-auto">

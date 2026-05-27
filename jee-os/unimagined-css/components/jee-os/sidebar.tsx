@@ -8,12 +8,17 @@ import {
   Calculator,
   School,
   Settings,
-  Sparkles
+  Sparkles,
+  LogOut,
+  User
 } from 'lucide-react'
+import type { User as FirebaseUser } from 'firebase/auth'
 
 interface SidebarProps {
   activePage: string
   setActivePage: (page: string) => void
+  user?: FirebaseUser | null
+  onLogout?: () => Promise<void>
 }
 
 const navItems = [
@@ -26,7 +31,7 @@ const navItems = [
   { id: 'settings', label: 'Settings', icon: Settings, section: 'Tools' },
 ]
 
-export function Sidebar({ activePage, setActivePage }: SidebarProps) {
+export function Sidebar({ activePage, setActivePage, user, onLogout }: SidebarProps) {
   const sections = [...new Set(navItems.map(item => item.section))]
 
   return (
@@ -76,6 +81,40 @@ export function Sidebar({ activePage, setActivePage }: SidebarProps) {
           ))}
         </div>
       </nav>
+
+      {/* User Section (if logged in with Firebase) */}
+      {user && onLogout && (
+        <div className="hidden lg:block px-6 py-4 border-t border-[var(--border-subtle)]">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-full bg-[var(--surface-hover)] flex items-center justify-center">
+              {user.photoURL ? (
+                <img 
+                  src={user.photoURL} 
+                  alt={user.displayName || 'User'} 
+                  className="w-full h-full rounded-full"
+                />
+              ) : (
+                <User className="w-4 h-4 text-[var(--text-muted)]" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                {user.displayName || 'Anonymous User'}
+              </p>
+              <p className="text-xs text-[var(--text-muted)] truncate">
+                {user.email || 'Not signed in'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] rounded-lg transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Sign Out</span>
+          </button>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="hidden lg:block px-6 pt-4 mt-auto border-t border-[var(--border-subtle)]">
