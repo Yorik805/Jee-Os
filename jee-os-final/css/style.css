@@ -1,0 +1,66 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap');
+:root {
+  --bg:#090b12;
+  --bg2:#0f1320;
+  --surface:#111625;
+  --card:#151c2d;
+  --card2:#121a2a;
+  --border:#2a344d;
+  --accent:#7c72ff;
+  --accent2:#00d9a3;
+  --accent3:#ff6b6b;
+  --accent4:#ffd166;
+  --text:#ebefff;
+  --muted:#8e99b3;
+  --font-main:'Syne',sans-serif;
+  --font-mono:'Space Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%}
+body{
+  background:
+    radial-gradient(1000px 500px at 10% -10%, rgba(124,114,255,.18), transparent 60%),
+    radial-gradient(800px 500px at 95% 0%, rgba(0,217,163,.12), transparent 60%),
+    linear-gradient(180deg,var(--bg),var(--bg2));
+  color:var(--text);
+  font-family:var(--font-main);
+  letter-spacing:.2px;
+}
+button,input,select,textarea{font:inherit}
+.sr-only{position:absolute;left:-9999px}
+.page-title{
+  font-size:26px;
+  font-weight:700;
+  letter-spacing:0;
+  line-height:1.12;
+  font-stretch:normal;
+  text-wrap:balance;
+  margin-bottom:6px;
+}
+.page-sub{font-size:13px;color:var(--muted);margin-bottom:26px}
+.section-title{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1.8px;text-transform:uppercase;margin-bottom:12px}
+.sub-title{font-size:15px;font-weight:700;margin-bottom:16px}
+.stat-label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1.8px;text-transform:uppercase;margin-bottom:8px}
+.stat-val{
+  font-size:28px;
+  font-weight:700;
+  line-height:1.08;
+  letter-spacing:0;
+  font-stretch:normal;
+  font-variant-numeric:tabular-nums lining-nums;
+  font-feature-settings:"tnum" 1,"lnum" 1;
+  text-wrap:balance;
+}
+.stat-val.sm{
+  font-size:20px;
+  font-weight:700;
+  letter-spacing:0;
+}
+.mini-sub{font-size:12px;color:var(--muted);margin-top:8px}
+.accent{color:var(--accent)}
+.accent2{color:var(--accent2)}
+.accent3{color:var(--accent3)}
+.accent4{color:var(--accent4)}
+.mb-20{margin-bottom:20px}
+.mb-16{margin-bottom:16px}
+.mt-16{margin-top:16px}

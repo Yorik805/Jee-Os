@@ -1,0 +1,19 @@
+window.JEEOS = window.JEEOS || {};
+const A=JEEOS.utils;
+function chapterCompletion(ch){const t=A.safeNumber(ch.exTotal)+A.safeNumber(ch.s2Total)+A.safeNumber(ch.s3Total);const d=A.safeNumber(ch.exDone)+A.safeNumber(ch.s2Done)+A.safeNumber(ch.s3Done);return A.percentage(d,t);}
+function calculateStreak(db){const set=new Set(db.sessions.map(s=>s.date));let streak=0;const d=new Date();for(;;){const k=d.toISOString().slice(0,10);if(set.has(k)){streak++;d.setDate(d.getDate()-1);}else break;}return streak;}
+function calculateOverallProgress(db){let d=0,t=0;JEEOS.SUBJECTS.forEach(s=>db.chapters[s].forEach(ch=>{d+=A.safeNumber(ch.exDone)+A.safeNumber(ch.s2Done)+A.safeNumber(ch.s3Done);t+=A.safeNumber(ch.exTotal)+A.safeNumber(ch.s2Total)+A.safeNumber(ch.s3Total);}));return A.percentage(d,t);}
+function calculateSubjectAccuracy(db,subject){const arr=db.sessions.filter(s=>s.subject===subject);const done=arr.reduce((x,s)=>x+A.safeNumber(s.done),0);const correct=arr.reduce((x,s)=>x+A.safeNumber(s.correct),0);return A.percentage(correct,done);}
+function calculateChapterCompletion(chapter){return chapterCompletion(chapter);}
+function calculateMasteryScore(db,subject,chapter){const comp=chapterCompletion(chapter);const all=db.sessions.filter(s=>s.subject===subject&&s.chapter===chapter.name);const acc=calculateSubjectAccuracy({sessions:all},subject);const recent=all.filter(s=>A.daysBetween(A.today(),s.date)<=7).length;const consistency=Math.min(100,recent*20);const score=Math.round(comp*0.5+acc*0.35+consistency*0.15);const rating=score>=80?'MASTERED':score>=60?'GOOD':score>=40?'WEAK':'DANGER';return {score,rating};}
+function getWeakChapters(db){const out=[];JEEOS.SUBJECTS.forEach(s=>db.chapters[s].forEach(ch=>{const m=calculateMasteryScore(db,s,ch);const flags=db.sessions.filter(x=>x.subject===s&&x.chapter===ch.name&&x.flag).length;if(m.score<50||chapterCompletion(ch)<40||flags>=2){out.push({subject:s,chapter:ch.name,score:m.score,flags});}}));return out.sort((a,b)=>a.score-b.score);}
+function generateRevisionQueue(db){const today=A.today();const items=[];JEEOS.SUBJECTS.forEach(s=>db.chapters[s].forEach(ch=>{const last=ch.lastTouched||ch.createdAt||today;const idle=A.daysBetween(today,last);const m=calculateMasteryScore(db,s,ch);const flags=db.sessions.filter(x=>x.subject===s&&x.chapter===ch.name&&x.flag).length;const acc=calculateMasteryScore(db,s,ch).score;if(acc<55||idle>=7||flags>=3||m.score<45){items.push({subject:s,chapter:ch.name,idle,mastery:m.rating,score:m.score,flags});}}));return items.sort((a,b)=>a.score-b.score||b.idle-a.idle);}
+function getTodayStats(db){const t=A.today();const sessions=db.sessions.filter(s=>s.date===t);const done=sessions.reduce((a,s)=>a+A.safeNumber(s.done),0);return {done,flagged:sessions.filter(s=>s.flag).length,sessions:sessions.length};}
+function getAnalyticsSnapshot(db){
+  const bySub=JEEOS.SUBJECTS.map(s=>({subject:s,accuracy:calculateSubjectAccuracy(db,s),completion:db.chapters[s].length?Math.round(db.chapters[s].reduce((a,c)=>a+chapterCompletion(c),0)/db.chapters[s].length):0}));
+  const strongest=[...bySub].sort((a,b)=>(b.accuracy+b.completion)-(a.accuracy+a.completion))[0]||null;
+  const weakest=[...bySub].sort((a,b)=>(a.accuracy+a.completion)-(b.accuracy+b.completion))[0]||null;
+  const totalQuestions=db.sessions.reduce((a,s)=>a+A.safeNumber(s.done),0);
+  return {streak:calculateStreak(db),overallProgress:calculateOverallProgress(db),today:getTodayStats(db),totalQuestions,weakChapters:getWeakChapters(db),revisionQueue:generateRevisionQueue(db),strongestSubject:strongest,weakestSubject:weakest,bySubject:bySub,flaggedSessions:db.sessions.filter(s=>s.flag).length};
+}
+JEEOS.analytics={chapterCompletion,calculateStreak,calculateOverallProgress,calculateSubjectAccuracy,calculateChapterCompletion,getWeakChapters,generateRevisionQueue,calculateMasteryScore,getTodayStats,getAnalyticsSnapshot};

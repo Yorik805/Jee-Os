@@ -1,0 +1,132 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0b0f" />
+  <title>JEE OS</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/unimagined-theme.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/question-log.css" />
+  <link rel="stylesheet" href="css/animations.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+</head>
+<body>
+  <h1 class="sr-only">JEE OS Dashboard</h1>
+
+  <div class="dash">
+    <aside class="sidebar">
+      <div class="logo">JEE OS</div>
+      <div class="logo-signature">by Yorik</div>
+      <div class="nav-section">Overview</div>
+      <button class="nav-item active" data-page="overview">Dashboard</button>
+      <button class="nav-item" data-page="tracker">Question Log</button>
+      <div class="nav-section">Subjects</div>
+      <button class="nav-item" data-page="physics">Physics</button>
+      <button class="nav-item" data-page="chemistry">Chemistry</button>
+      <button class="nav-item" data-page="math">Mathematics</button>
+      <div class="nav-section">Tools</div>
+      <button class="nav-item" data-page="school">School Progress</button>
+      <button class="nav-item" data-page="settings">Settings</button>
+    </aside>
+
+    <main class="main">
+      <section class="page active" id="page-overview">
+        <div class="page-title">Mission Control</div>
+        <div class="page-sub">Your JEE prep at a glance</div>
+        <div class="grid4">
+          <article class="card card-sm"><div class="stat-label">Total Done</div><div class="stat-val" id="ov-total">0</div><div class="mini-sub">questions solved</div></article>
+          <article class="card card-sm"><div class="stat-label">Today</div><div class="stat-val accent2" id="ov-today">0</div><div class="mini-sub">solved today</div></article>
+          <article class="card card-sm"><div class="stat-label">Streak</div><div class="stat-val accent4" id="ov-streak">0</div><div class="mini-sub">days in a row</div></article>
+          <article class="card card-sm"><div class="stat-label">Overall</div><div class="stat-val accent" id="ov-pct">0%</div><div class="mini-sub">syllabus covered</div></article>
+        </div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="section-title">Daily Goal</div>
+          <div class="goal-row"><span id="goal-label">0 / 0</span><span id="goal-state" class="tag tag-warn">IN PROGRESS</span></div>
+          <div class="progress-bar"><div class="progress-fill" id="goal-fill"></div></div>
+        </div>
+        <div class="grid3">
+          <article class="card"><div class="section-title">Physics</div><div class="progress-bar"><div class="progress-fill fill-p" id="ov-phy-bar"></div></div><div class="mini-sub" id="ov-phy-txt">0 / 0 chapters touched</div></article>
+          <article class="card"><div class="section-title">Chemistry</div><div class="progress-bar"><div class="progress-fill fill-c" id="ov-chem-bar"></div></div><div class="mini-sub" id="ov-chem-txt">0 / 0 chapters touched</div></article>
+          <article class="card"><div class="section-title">Mathematics</div><div class="progress-bar"><div class="progress-fill fill-m" id="ov-math-bar"></div></div><div class="mini-sub" id="ov-math-txt">0 / 0 chapters touched</div></article>
+        </div>
+        <article class="card"><div class="section-title">7-Day Activity</div><div class="chart-wrap"><canvas id="actChart"></canvas></div></article>
+        <article class="card mt-16"><div class="section-title">Revision Queue <span id="flag-count" class="accent3"></span></div><div id="flag-list" class="list-stack"></div></article>
+      </section>
+
+      <section class="page" id="page-tracker">
+        <div class="page-title">Question Log</div>
+        <div class="page-sub">Range-based progress logging with doubts tracking</div>
+        <article class="card mb-20 tracker-card">
+          <div class="sub-title">Log Progress</div>
+          <div class="form-row cols3">
+            <label><span class="label">Subject</span><select id="log-sub"><option>Physics</option><option>Chemistry</option><option>Mathematics</option></select></label>
+            <label><span class="label">Chapter</span><select id="log-ch"></select></label>
+            <label><span class="label">Question Type</span><select id="log-type"><option>Exercise</option><option>Step 2</option><option>Step 3</option></select></label>
+          </div>
+          <div class="tracker-range-row">
+            <label class="range-mini"><span class="label">Start</span><input type="number" id="log-range-start" min="1" /></label>
+            <label class="range-mini"><span class="label">End</span><input type="number" id="log-range-end" min="1" /></label>
+            <label class="range-done"><span class="label">Solved</span><input type="number" id="log-done" min="0" /></label>
+          </div>
+          <div class="form-row cols2">
+            <label><span class="label">Doubt Questions</span><input type="text" id="log-doubts" placeholder="e.g. 8,12,19" /></label>
+            <label><span class="label">Flag for Revision?</span><select id="log-flag"><option value="0">No</option><option value="1">Yes</option></select></label>
+          </div>
+          <div class="form-row"><label><span class="label">Notes</span><input type="text" id="log-notes" /></label></div>
+          <button class="btn" id="btn-log-session">Save Progress</button>
+        </article>
+
+        <article class="card">
+          <div class="section-title">Progress History</div>
+          <table>
+            <thead><tr><th>Date</th><th>Subject</th><th>Chapter</th><th>Type</th><th>Range</th><th>Solved</th><th>Left</th><th>Doubts</th><th>Notes</th></tr></thead>
+            <tbody id="log-body"></tbody>
+          </table>
+        </article>
+      </section>
+
+      <section class="page" id="page-physics"><div class="subject-head"><div class="page-title">Physics</div></div><div class="page-sub">Chapter-wise breakdown</div><div class="grid2 mb-16"><article class="card card-sm"><div class="stat-label">Total Chapters</div><div class="stat-val sm" id="phy-total-ch">0</div></article><article class="card card-sm"><div class="stat-label">Avg Completion</div><div class="stat-val sm" id="phy-avg">0%</div></article></div><article class="card" id="phy-chapters"></article></section>
+      <section class="page" id="page-chemistry"><div class="subject-head"><div class="page-title">Chemistry</div></div><div class="page-sub">Chapter-wise breakdown</div><div class="grid2 mb-16"><article class="card card-sm"><div class="stat-label">Total Chapters</div><div class="stat-val sm" id="chem-total-ch">0</div></article><article class="card card-sm"><div class="stat-label">Avg Completion</div><div class="stat-val sm" id="chem-avg">0%</div></article></div><article class="card" id="chem-chapters"></article></section>
+      <section class="page" id="page-math"><div class="subject-head"><div class="page-title">Mathematics</div></div><div class="page-sub">Chapter-wise breakdown</div><div class="grid2 mb-16"><article class="card card-sm"><div class="stat-label">Total Chapters</div><div class="stat-val sm" id="math-total-ch">0</div></article><article class="card card-sm"><div class="stat-label">Avg Completion</div><div class="stat-val sm" id="math-avg">0%</div></article></div><article class="card" id="math-chapters"></article></section>
+
+      <section class="page" id="page-school">
+        <div class="page-title">School vs You</div><div class="page-sub">Track if you are ahead or behind</div>
+        <article class="card mb-20"><div class="sub-title">Update School Position</div><div class="form-row cols3"><label><span class="label">Subject</span><select id="sch-sub"><option>Physics</option><option>Chemistry</option><option>Mathematics</option></select></label><label><span class="label">Current Chapter</span><input type="text" id="sch-chapter" /></label><label><span class="label">Chapter Index</span><input type="number" id="sch-idx" min="1" /></label></div><button class="btn" id="btn-update-school">Update</button></article>
+        <div id="race-cards"></div>
+      </section>
+
+      <section class="page" id="page-settings">
+        <div class="page-title">Settings</div><div class="page-sub">Manage your setup and data</div>
+        <article class="card mb-16"><div class="sub-title">Daily Goal</div><div class="form-row cols2"><label><span class="label">Target questions / day</span><input type="number" id="daily-goal" min="1" /></label></div></article>
+        <article class="card mb-16">
+          <div class="sub-title">Add Chapter</div>
+          <div class="form-row cols3"><label><span class="label">Subject</span><select id="set-ch-sub"><option>Physics</option><option>Chemistry</option><option>Mathematics</option></select></label><label><span class="label">Chapter Name</span><input type="text" id="set-ch-name" /></label><label><span class="label">Notes</span><input type="text" id="set-ch-notes" /></label></div>
+          <div class="form-row cols3"><label><span class="label">Exercise Total</span><input type="number" id="set-ch-ex-total" min="0" /></label><label><span class="label">Step 2 Total</span><input type="number" id="set-ch-s2-total" min="0" /></label><label><span class="label">Step 3 Total</span><input type="number" id="set-ch-s3-total" min="0" /></label></div>
+          <button class="btn" id="btn-settings-add-ch">Add Chapter</button>
+        </article>
+        <article class="card mb-16"><div class="sub-title">Data</div><div class="flex"><button class="btn" id="btn-export">Export JSON</button><button class="btn btn-ghost" id="btn-import">Import JSON</button><button class="btn btn-danger" id="btn-reset">Reset All</button></div></article>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/analytics.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/subjects.js"></script>
+  <script src="js/tracker.js"></script>
+  <script src="js/school.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
+

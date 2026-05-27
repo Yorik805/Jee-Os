@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JEE Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    
+<h2 class="sr-only">JEE Prep Dashboard — track chapters, questions, and daily progress across Physics, Chemistry, and Math.</h2>
+
+<div class="dash">
+  <div class="sidebar">
+    <div class="logo">JEE<span>·</span>OS</div>
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active" onclick="nav('overview',this)"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Dashboard</div>
+    <div class="nav-item" onclick="nav('tracker',this)"><i class="ti ti-circle-check" aria-hidden="true"></i>Question Log</div>
+    <div class="nav-section">Subjects</div>
+    <div class="nav-item" onclick="nav('physics',this)"><i class="ti ti-bolt" aria-hidden="true"></i>Physics</div>
+    <div class="nav-item" onclick="nav('chemistry',this)"><i class="ti ti-flask" aria-hidden="true"></i>Chemistry</div>
+    <div class="nav-item" onclick="nav('math',this)"><i class="ti ti-math" aria-hidden="true"></i>Mathematics</div>
+    <div class="nav-section">Tools</div>
+    <div class="nav-item" onclick="nav('school',this)"><i class="ti ti-school" aria-hidden="true"></i>School Progress</div>
+    <div class="nav-item" onclick="nav('settings',this)"><i class="ti ti-settings" aria-hidden="true"></i>Settings</div>
+  </div>
+
+  <div class="main">
+
+    <!-- OVERVIEW -->
+    <div class="page active" id="page-overview">
+      <div class="page-title">Mission Control</div>
+      <div class="page-sub">Your JEE prep at a glance</div>
+      <div class="grid4">
+        <div class="card card-sm">
+          <div class="stat-label">Total Done</div>
+          <div class="stat-val" id="ov-total">0</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">questions solved</div>
+        </div>
+        <div class="card card-sm">
+          <div class="stat-label">Today</div>
+          <div class="stat-val" id="ov-today" style="color:var(--accent2)">0</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">solved today</div>
+        </div>
+        <div class="card card-sm">
+          <div class="stat-label">Streak</div>
+          <div class="stat-val" id="ov-streak" style="color:var(--accent4)">0</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">days in a row</div>
+        </div>
+        <div class="card card-sm">
+          <div class="stat-label">Overall</div>
+          <div class="stat-val" id="ov-pct" style="color:var(--accent)">0%</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">syllabus covered</div>
+        </div>
+      </div>
+
+      <div class="grid3">
+        <div class="card">
+          <div class="section-title">Physics</div>
+          <div id="ov-phy-ring"></div>
+          <div class="progress-bar" style="margin-top:12px"><div class="progress-fill" id="ov-phy-bar" style="background:var(--tag-p,#9c95ff)"></div></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px" id="ov-phy-txt">0 / 0 chapters touched</div>
+        </div>
+        <div class="card">
+          <div class="section-title">Chemistry</div>
+          <div id="ov-chem-ring"></div>
+          <div class="progress-bar" style="margin-top:12px"><div class="progress-fill" id="ov-chem-bar" style="background:var(--accent2)"></div></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px" id="ov-chem-txt">0 / 0 chapters touched</div>
+        </div>
+        <div class="card">
+          <div class="section-title">Mathematics</div>
+          <div id="ov-math-ring"></div>
+          <div class="progress-bar" style="margin-top:12px"><div class="progress-fill" id="ov-math-bar" style="background:var(--accent3)"></div></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px" id="ov-math-txt">0 / 0 chapters touched</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">7-Day Activity</div>
+        <div style="position:relative;height:180px"><canvas id="actChart" role="img" aria-label="Bar chart showing questions solved per day over last 7 days">Daily question activity for the past week.</canvas></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="flex-between" style="margin-bottom:14px">
+          <div class="section-title" style="margin:0">Revision Flags <span id="flag-count" style="color:var(--accent3);font-size:12px"></span></div>
+        </div>
+        <div id="flag-list"><div style="color:var(--muted);font-size:13px">No flagged questions yet. Mark questions for revision from the Question Log.</div></div>
+      </div>
+    </div>
+
+    <!-- QUESTION LOG -->
+    <div class="page" id="page-tracker">
+      <div class="page-title">Question Log</div>
+      <div class="page-sub">Log every session, track progress per question type</div>
+      <div class="card" style="margin-bottom:20px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:16px">Log a Session</div>
+        <div class="form-row cols3">
+          <div><div class="label">Subject</div><select id="log-sub"><option>Physics</option><option>Chemistry</option><option>Mathematics</option></select></div>
+          <div><div class="label">Chapter</div><select id="log-ch"><option>— select subject first —</option></select></div>
+          <div><div class="label">Question Type</div><select id="log-type"><option>Exercise</option><option>Step 2</option><option>Step 3</option></select></div>
+        </div>
+        <div class="form-row cols3">
+          <div><div class="label">Questions Done</div><input type="number" id="log-done" placeholder="e.g. 10" min="0"></div>
+          <div><div class="label">Correct</div><input type="number" id="log-correct" placeholder="e.g. 7" min="0"></div>
+          <div><div class="label">Flag for Revision?</div>
+            <select id="log-flag"><option value="0">No</option><option value="1">Yes</option></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div><div class="label">Notes (optional)</div><input type="text" id="log-notes" placeholder="e.g. struggled with integration by parts"></div>
+        </div>
+        <button class="btn" onclick="logSession()"><i class="ti ti-plus" aria-hidden="true"></i> Log Session</button>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Session History</div>
+        <table>
+          <thead><tr><th>Date</th><th>Subject</th><th>Chapter</th><th>Type</th><th>Done</th><th>Correct</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="log-body"><tr><td colspan="8" style="color:var(--muted);padding:20px 12px">No sessions logged yet.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PHYSICS PAGE -->
+    <div class="page" id="page-physics">
+      <div class="flex-between" style="margin-bottom:4px">
+        <div class="page-title"><span class="tag tag-p" style="font-size:14px;padding:4px 10px;margin-right:8px">PHY</span>Physics</div>
+        <button class="btn btn-sm" onclick="openAddChapter('Physics')"><i class="ti ti-plus" aria-hidden="true"></i> Add Chapter</button>
+      </div>
+      <div class="page-sub">Chapter-wise breakdown · Exercise / Step 2 / Step 3</div>
+      <div class="grid2" style="margin-bottom:16px">
+        <div class="card card-sm"><div class="stat-label">Total Chapters</div><div class="stat-val sm" id="phy-total-ch">0</div></div>
+        <div class="card card-sm"><div class="stat-label">Avg Completion</div><div class="stat-val sm" id="phy-avg">0%</div></div>
+      </div>
+      <div class="card" id="phy-chapters"><div style="color:var(--muted);font-size:13px;padding:8px 0">No chapters added yet. Click "Add Chapter" to begin.</div></div>
+    </div>
+
+    <!-- CHEMISTRY PAGE -->
+    <div class="page" id="page-chemistry">
+      <div class="flex-between" style="margin-bottom:4px">
+        <div class="page-title"><span class="tag tag-c" style="font-size:14px;padding:4px 10px;margin-right:8px">CHEM</span>Chemistry</div>
+        <button class="btn btn-sm" onclick="openAddChapter('Chemistry')"><i class="ti ti-plus" aria-hidden="true"></i> Add Chapter</button>
+      </div>
+      <div class="page-sub">Chapter-wise breakdown · Exercise / Step 2 / Step 3</div>
+      <div class="grid2" style="margin-bottom:16px">
+        <div class="card card-sm"><div class="stat-label">Total Chapters</div><div class="stat-val sm" id="chem-total-ch">0</div></div>
+        <div class="card card-sm"><div class="stat-label">Avg Completion</div><div class="stat-val sm" id="chem-avg">0%</div></div>
+      </div>
+      <div class="card" id="chem-chapters"><div style="color:var(--muted);font-size:13px;padding:8px 0">No chapters added yet.</div></div>
+    </div>
+
+    <!-- MATH PAGE -->
+    <div class="page" id="page-math">
+      <div class="flex-between" style="margin-bottom:4px">
+        <div class="page-title"><span class="tag tag-m" style="font-size:14px;padding:4px 10px;margin-right:8px">MATH</span>Mathematics</div>
+        <button class="btn btn-sm" onclick="openAddChapter('Mathematics')"><i class="ti ti-plus" aria-hidden="true"></i> Add Chapter</button>
+      </div>
+      <div class="page-sub">Chapter-wise breakdown · Exercise / Step 2 / Step 3</div>
+      <div class="grid2" style="margin-bottom:16px">
+        <div class="card card-sm"><div class="stat-label">Total Chapters</div><div class="stat-val sm" id="math-total-ch">0</div></div>
+        <div class="card card-sm"><div class="stat-label">Avg Completion</div><div class="stat-val sm" id="math-avg">0%</div></div>
+      </div>
+      <div class="card" id="math-chapters"><div style="color:var(--muted);font-size:13px;padding:8px 0">No chapters added yet.</div></div>
+    </div>
+
+    <!-- SCHOOL PROGRESS -->
+    <div class="page" id="page-school">
+      <div class="page-title">School vs You</div>
+      <div class="page-sub">Track where your school is — see if you're ahead or behind</div>
+      <div class="card" style="margin-bottom:20px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:16px">Update School's Position</div>
+        <div class="form-row cols3">
+          <div><div class="label">Subject</div><select id="sch-sub"><option>Physics</option><option>Chemistry</option><option>Mathematics</option></select></div>
+          <div><div class="label">Current Chapter</div><input type="text" id="sch-chapter" placeholder="e.g. Thermodynamics"></div>
+          <div><div class="label">Chapter Index (1-based)</div><input type="number" id="sch-idx" placeholder="e.g. 4" min="1"></div>
+        </div>
+        <button class="btn" onclick="updateSchool()"><i class="ti ti-refresh" aria-hidden="true"></i> Update</button>
+      </div>
+      <div id="race-cards"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="page-title">Settings</div>
+      <div class="page-sub">Export, reset, and manage your data</div>
+      <div class="card" style="margin-bottom:16px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px">Daily Goal</div>
+        <div class="form-row cols2">
+          <div><div class="label">Target questions / day</div><input type="number" id="daily-goal" value="30" min="1" onchange="saveGoal()"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px">Data</div>
+        <div class="flex" style="gap:12px">
+          <button class="btn" onclick="exportData()"><i class="ti ti-download" aria-hidden="true"></i> Export JSON</button>
+          <button class="btn btn-ghost" onclick="importData()"><i class="ti ti-upload" aria-hidden="true"></i> Import JSON</button>
+          <button class="btn btn-danger" onclick="resetData()"><i class="ti ti-trash" aria-hidden="true"></i> Reset All</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ADD CHAPTER MODAL -->
+<div class="modal-overlay" id="ch-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Add Chapter</div>
+    <div class="form-row"><div><div class="label">Chapter Name</div><input type="text" id="ch-name" placeholder="e.g. Kinematics"></div></div>
+    <div class="form-row cols3">
+      <div><div class="label">Exercise (total)</div><input type="number" id="ch-ex-total" placeholder="0" min="0"></div>
+      <div><div class="label">Step 2 (total)</div><input type="number" id="ch-s2-total" placeholder="0" min="0"></div>
+      <div><div class="label">Step 3 (total)</div><input type="number" id="ch-s3-total" placeholder="0" min="0"></div>
+    </div>
+    <div class="form-row cols3">
+      <div><div class="label">Exercise done</div><input type="number" id="ch-ex-done" placeholder="0" min="0"></div>
+      <div><div class="label">Step 2 done</div><input type="number" id="ch-s2-done" placeholder="0" min="0"></div>
+      <div><div class="label">Step 3 done</div><input type="number" id="ch-s3-done" placeholder="0" min="0"></div>
+    </div>
+    <div class="form-row"><div><div class="label">Notes</div><textarea id="ch-notes" placeholder="Key concepts, formulas, weak areas..."></textarea></div></div>
+    <div class="flex" style="gap:10px;margin-top:4px">
+      <button class="btn" onclick="saveChapter()">Save Chapter</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>

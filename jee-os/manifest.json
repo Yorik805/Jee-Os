@@ -1,0 +1,9 @@
+{
+  "name": "JEE·OS",
+  "short_name": "JEEOS",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0b0f",
+  "theme_color": "#0a0b0f",
+  "description": "Cyberpunk JEE preparation operating dashboard"
+}

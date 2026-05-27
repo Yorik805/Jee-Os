@@ -1,0 +1,22 @@
+﻿.dash{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}
+.main{overflow-y:auto;padding:18px 18px 28px}
+.page{
+  display:none;
+  padding:28px;
+  max-width:1280px;
+  margin:0 auto;
+}
+.page.active{display:block}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:20px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.form-row{display:grid;gap:12px;margin-bottom:14px}
+.form-row.cols2{grid-template-columns:1fr 1fr}
+.form-row.cols3{grid-template-columns:1fr 1fr 1fr}
+.flex{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.subject-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:8px}
+.chart-wrap{position:relative;height:200px}
+.list-stack>div{padding:12px 0;border-bottom:1px solid rgba(96,111,147,.24)}
+.goal-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:10px}
+
+

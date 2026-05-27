@@ -1,0 +1,599 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#0a0b0f;--surface:#12141a;--card:#1a1d26;--border:#2a2d3a;--accent:#6c63ff;--accent2:#00d9a3;--accent3:#ff6b6b;--accent4:#ffd166;--text:#e8eaf0;--muted:#6b7280;--font-main:'Syne',sans-serif;--font-mono:'Space Mono',monospace
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font-main);min-height:100vh;padding:0}
+.dash{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column;gap:4px}
+.logo{padding:0 20px 24px;font-size:18px;font-weight:800;letter-spacing:-0.5px;color:var(--text)}
+.logo span{color:var(--accent)}
+.nav-item{padding:10px 20px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);border-left:3px solid transparent;transition:all .2s;display:flex;align-items:center;gap:10px;letter-spacing:.3px}
+.nav-item.active,.nav-item:hover{color:var(--text);border-left-color:var(--accent);background:rgba(108,99,255,.08)}
+.nav-item i{font-size:16px}
+.nav-section{padding:16px 20px 6px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+.main{overflow-y:auto;background:var(--bg)}
+.page{display:none;padding:32px}
+.page.active{display:block}
+.page-title{font-size:26px;font-weight:800;margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--muted);margin-bottom:28px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card-sm{padding:14px 16px}
+.stat-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px}
+.stat-val{font-size:28px;font-weight:800;line-height:1}
+.stat-val.sm{font-size:20px}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:.5px}
+.tag-p{background:rgba(108,99,255,.15);color:#9c95ff}
+.tag-c{background:rgba(0,217,163,.12);color:#00d9a3}
+.tag-m{background:rgba(255,107,107,.12);color:#ff8080}
+.tag-good{background:rgba(0,217,163,.12);color:#00d9a3}
+.tag-warn{background:rgba(255,209,102,.12);color:#ffd166}
+.tag-bad{background:rgba(255,107,107,.12);color:#ff8080}
+.progress-bar{height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;border-radius:3px;transition:width .6s ease}
+.section-title{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;margin-top:24px}
+.section-title:first-child{margin-top:0}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{padding:8px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)}
+tbody tr{border-bottom:1px solid rgba(42,45,58,.6);transition:background .15s}
+tbody tr:hover{background:rgba(255,255,255,.02)}
+tbody td{padding:10px 12px;vertical-align:middle}
+.btn{background:var(--accent);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font-main);transition:opacity .2s;letter-spacing:.3px}
+.btn:hover{opacity:.85}
+.btn-sm{padding:6px 14px;font-size:12px;border-radius:6px}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{background:rgba(255,255,255,.05)}
+.btn-danger{background:#ff4444}
+input,select,textarea{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-size:13px;font-family:var(--font-main);outline:none;width:100%;transition:border .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:80px}
+.form-row{display:grid;gap:12px;margin-bottom:14px}
+.form-row.cols2{grid-template-columns:1fr 1fr}
+.form-row.cols3{grid-template-columns:1fr 1fr 1fr}
+.label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}
+.ring-wrap{display:flex;align-items:center;gap:16px}
+.ring-info{flex:1}
+.ring-name{font-size:14px;font-weight:700;margin-bottom:2px}
+.ring-meta{font-size:12px;color:var(--muted)}
+.chapter-row{padding:14px 0;border-bottom:1px solid rgba(42,45,58,.6);display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}
+.chapter-row:last-child{border-bottom:none}
+.ch-name{font-size:14px;font-weight:700;margin-bottom:4px}
+.ch-sub{font-size:12px;color:var(--muted);margin-bottom:8px}
+.q-bars{display:flex;gap:8px;margin-top:8px}
+.q-bar-item{flex:1}
+.q-bar-label{font-size:10px;color:var(--muted);margin-bottom:3px;font-weight:600;letter-spacing:.5px}
+.q-bar-track{height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden}
+.q-bar-fill{height:100%;border-radius:3px}
+.streak-box{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.streak-day{width:12px;height:12px;border-radius:2px;background:rgba(255,255,255,.06)}
+.streak-day.done{background:var(--accent2)}
+.streak-day.today{background:var(--accent);box-shadow:0 0 6px rgba(108,99,255,.5)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;display:none}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:520px;max-height:85vh;overflow-y:auto}
+.modal-title{font-size:18px;font-weight:800;margin-bottom:20px}
+.flex{display:flex;align-items:center;gap:10px}
+.flex-between{display:flex;align-items:center;justify-content:space-between}
+.gap4{gap:4px} .gap8{gap:8px}
+.race-bar{height:32px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden;position:relative;margin-top:8px}
+.race-you{height:100%;border-radius:6px;position:absolute;top:0;left:0;display:flex;align-items:center;padding:0 10px;font-size:11px;font-weight:700;color:#fff;transition:width .6s}
+.race-school{position:absolute;top:50%;transform:translateY(-50%);width:3px;border-radius:2px;background:var(--accent4)}
+.chip-group{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--border);color:var(--muted);transition:all .2s}
+.chip.active{border-color:var(--accent);color:var(--accent);background:rgba(108,99,255,.1)}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--accent2);color:var(--accent2);padding:12px 20px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;transform:translateY(60px);opacity:0;transition:all .3s;pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}
+canvas{display:block}
+</style>
+
+<h2 class="sr-only">JEE Prep Dashboard — track chapters, questions, and daily progress across Physics, Chemistry, and Math.</h2>
+
+<div class="dash">
+  <div class="sidebar">
+    <div class="logo">JEE<span>·</span>OS</div>
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active" onclick="nav('overview',this)"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Dashboard</div>
+    <div class="nav-item" onclick="nav('tracker',this)"><i class="ti ti-circle-check" aria-hidden="true"></i>Question Log</div>
+    <div class="nav-section">Subjects</div>
+    <div class="nav-item" onclick="nav('physics',this)"><i class="ti ti-bolt" aria-hidden="true"></i>Physics</div>
+    <div class="nav-item" onclick="nav('chemistry',this)"><i class="ti ti-flask" aria-hidden="true"></i>Chemistry</div>
+    <div class="nav-item" onclick="nav('math',this)"><i class="ti ti-math" aria-hidden="true"></i>Mathematics</div>
+    <div class="nav-section">Tools</div>
+    <div class="nav-item" onclick="nav('school',this)"><i class="ti ti-school" aria-hidden="true"></i>School Progress</div>
+    <div class="nav-item" onclick="nav('settings',this)"><i class="ti ti-settings" aria-hidden="true"></i>Settings</div>
+  </div>
+
+  <div class="main">
+
+    <!-- OVERVIEW -->
+    <div class="page active" id="page-overview">
+      <div class="page-title">Mission Control</div>
+      <div class="page-sub">Your JEE prep at a glance</div>
+      <div class="grid4">
+        <div class="card card-sm">
+          <div class="stat-label">Total Done</div>
+          <div class="stat-val" id="ov-total">0</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">questions solved</div>
+        </div>
+        <div class="card card-sm">
+          <div class="stat-label">Today</div>
+          <div class="stat-val" id="ov-today" style="color:var(--accent2)">0</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">solved today</div>
+        </div>
+        <div class="card card-sm">
+          <div class="stat-label">Streak</div>
+          <div class="stat-val" id="ov-streak" style="color:var(--accent4)">0</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">days in a row</div>
+        </div>
+        <div class="card card-sm">
+          <div class="stat-label">Overall</div>
+          <div class="stat-val" id="ov-pct" style="color:var(--accent)">0%</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">syllabus covered</div>
+        </div>
+      </div>
+
+      <div class="grid3">
+        <div class="card">
+          <div class="section-title">Physics</div>
+          <div id="ov-phy-ring"></div>
+          <div class="progress-bar" style="margin-top:12px"><div class="progress-fill" id="ov-phy-bar" style="background:var(--tag-p,#9c95ff)"></div></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px" id="ov-phy-txt">0 / 0 chapters touched</div>
+        </div>
+        <div class="card">
+          <div class="section-title">Chemistry</div>
+          <div id="ov-chem-ring"></div>
+          <div class="progress-bar" style="margin-top:12px"><div class="progress-fill" id="ov-chem-bar" style="background:var(--accent2)"></div></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px" id="ov-chem-txt">0 / 0 chapters touched</div>
+        </div>
+        <div class="card">
+          <div class="section-title">Mathematics</div>
+          <div id="ov-math-ring"></div>
+          <div class="progress-bar" style="margin-top:12px"><div class="progress-fill" id="ov-math-bar" style="background:var(--accent3)"></div></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px" id="ov-math-txt">0 / 0 chapters touched</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">7-Day Activity</div>
+        <div style="position:relative;height:180px"><canvas id="actChart" role="img" aria-label="Bar chart showing questions solved per day over last 7 days">Daily question activity for the past week.</canvas></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="flex-between" style="margin-bottom:14px">
+          <div class="section-title" style="margin:0">Revision Flags <span id="flag-count" style="color:var(--accent3);font-size:12px"></span></div>
+        </div>
+        <div id="flag-list"><div style="color:var(--muted);font-size:13px">No flagged questions yet. Mark questions for revision from the Question Log.</div></div>
+      </div>
+    </div>
+
+    <!-- QUESTION LOG -->
+    <div class="page" id="page-tracker">
+      <div class="page-title">Question Log</div>
+      <div class="page-sub">Log every session, track progress per question type</div>
+      <div class="card" style="margin-bottom:20px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:16px">Log a Session</div>
+        <div class="form-row cols3">
+          <div><div class="label">Subject</div><select id="log-sub"><option>Physics</option><option>Chemistry</option><option>Mathematics</option></select></div>
+          <div><div class="label">Chapter</div><select id="log-ch"><option>— select subject first —</option></select></div>
+          <div><div class="label">Question Type</div><select id="log-type"><option>Exercise</option><option>Step 2</option><option>Step 3</option></select></div>
+        </div>
+        <div class="form-row cols3">
+          <div><div class="label">Questions Done</div><input type="number" id="log-done" placeholder="e.g. 10" min="0"></div>
+          <div><div class="label">Correct</div><input type="number" id="log-correct" placeholder="e.g. 7" min="0"></div>
+          <div><div class="label">Flag for Revision?</div>
+            <select id="log-flag"><option value="0">No</option><option value="1">Yes</option></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div><div class="label">Notes (optional)</div><input type="text" id="log-notes" placeholder="e.g. struggled with integration by parts"></div>
+        </div>
+        <button class="btn" onclick="logSession()"><i class="ti ti-plus" aria-hidden="true"></i> Log Session</button>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Session History</div>
+        <table>
+          <thead><tr><th>Date</th><th>Subject</th><th>Chapter</th><th>Type</th><th>Done</th><th>Correct</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="log-body"><tr><td colspan="8" style="color:var(--muted);padding:20px 12px">No sessions logged yet.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PHYSICS PAGE -->
+    <div class="page" id="page-physics">
+      <div class="flex-between" style="margin-bottom:4px">
+        <div class="page-title"><span class="tag tag-p" style="font-size:14px;padding:4px 10px;margin-right:8px">PHY</span>Physics</div>
+        <button class="btn btn-sm" onclick="openAddChapter('Physics')"><i class="ti ti-plus" aria-hidden="true"></i> Add Chapter</button>
+      </div>
+      <div class="page-sub">Chapter-wise breakdown · Exercise / Step 2 / Step 3</div>
+      <div class="grid2" style="margin-bottom:16px">
+        <div class="card card-sm"><div class="stat-label">Total Chapters</div><div class="stat-val sm" id="phy-total-ch">0</div></div>
+        <div class="card card-sm"><div class="stat-label">Avg Completion</div><div class="stat-val sm" id="phy-avg">0%</div></div>
+      </div>
+      <div class="card" id="phy-chapters"><div style="color:var(--muted);font-size:13px;padding:8px 0">No chapters added yet. Click "Add Chapter" to begin.</div></div>
+    </div>
+
+    <!-- CHEMISTRY PAGE -->
+    <div class="page" id="page-chemistry">
+      <div class="flex-between" style="margin-bottom:4px">
+        <div class="page-title"><span class="tag tag-c" style="font-size:14px;padding:4px 10px;margin-right:8px">CHEM</span>Chemistry</div>
+        <button class="btn btn-sm" onclick="openAddChapter('Chemistry')"><i class="ti ti-plus" aria-hidden="true"></i> Add Chapter</button>
+      </div>
+      <div class="page-sub">Chapter-wise breakdown · Exercise / Step 2 / Step 3</div>
+      <div class="grid2" style="margin-bottom:16px">
+        <div class="card card-sm"><div class="stat-label">Total Chapters</div><div class="stat-val sm" id="chem-total-ch">0</div></div>
+        <div class="card card-sm"><div class="stat-label">Avg Completion</div><div class="stat-val sm" id="chem-avg">0%</div></div>
+      </div>
+      <div class="card" id="chem-chapters"><div style="color:var(--muted);font-size:13px;padding:8px 0">No chapters added yet.</div></div>
+    </div>
+
+    <!-- MATH PAGE -->
+    <div class="page" id="page-math">
+      <div class="flex-between" style="margin-bottom:4px">
+        <div class="page-title"><span class="tag tag-m" style="font-size:14px;padding:4px 10px;margin-right:8px">MATH</span>Mathematics</div>
+        <button class="btn btn-sm" onclick="openAddChapter('Mathematics')"><i class="ti ti-plus" aria-hidden="true"></i> Add Chapter</button>
+      </div>
+      <div class="page-sub">Chapter-wise breakdown · Exercise / Step 2 / Step 3</div>
+      <div class="grid2" style="margin-bottom:16px">
+        <div class="card card-sm"><div class="stat-label">Total Chapters</div><div class="stat-val sm" id="math-total-ch">0</div></div>
+        <div class="card card-sm"><div class="stat-label">Avg Completion</div><div class="stat-val sm" id="math-avg">0%</div></div>
+      </div>
+      <div class="card" id="math-chapters"><div style="color:var(--muted);font-size:13px;padding:8px 0">No chapters added yet.</div></div>
+    </div>
+
+    <!-- SCHOOL PROGRESS -->
+    <div class="page" id="page-school">
+      <div class="page-title">School vs You</div>
+      <div class="page-sub">Track where your school is — see if you're ahead or behind</div>
+      <div class="card" style="margin-bottom:20px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:16px">Update School's Position</div>
+        <div class="form-row cols3">
+          <div><div class="label">Subject</div><select id="sch-sub"><option>Physics</option><option>Chemistry</option><option>Mathematics</option></select></div>
+          <div><div class="label">Current Chapter</div><input type="text" id="sch-chapter" placeholder="e.g. Thermodynamics"></div>
+          <div><div class="label">Chapter Index (1-based)</div><input type="number" id="sch-idx" placeholder="e.g. 4" min="1"></div>
+        </div>
+        <button class="btn" onclick="updateSchool()"><i class="ti ti-refresh" aria-hidden="true"></i> Update</button>
+      </div>
+      <div id="race-cards"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="page-title">Settings</div>
+      <div class="page-sub">Export, reset, and manage your data</div>
+      <div class="card" style="margin-bottom:16px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px">Daily Goal</div>
+        <div class="form-row cols2">
+          <div><div class="label">Target questions / day</div><input type="number" id="daily-goal" value="30" min="1" onchange="saveGoal()"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px">Data</div>
+        <div class="flex" style="gap:12px">
+          <button class="btn" onclick="exportData()"><i class="ti ti-download" aria-hidden="true"></i> Export JSON</button>
+          <button class="btn btn-ghost" onclick="importData()"><i class="ti ti-upload" aria-hidden="true"></i> Import JSON</button>
+          <button class="btn btn-danger" onclick="resetData()"><i class="ti ti-trash" aria-hidden="true"></i> Reset All</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ADD CHAPTER MODAL -->
+<div class="modal-overlay" id="ch-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Add Chapter</div>
+    <div class="form-row"><div><div class="label">Chapter Name</div><input type="text" id="ch-name" placeholder="e.g. Kinematics"></div></div>
+    <div class="form-row cols3">
+      <div><div class="label">Exercise (total)</div><input type="number" id="ch-ex-total" placeholder="0" min="0"></div>
+      <div><div class="label">Step 2 (total)</div><input type="number" id="ch-s2-total" placeholder="0" min="0"></div>
+      <div><div class="label">Step 3 (total)</div><input type="number" id="ch-s3-total" placeholder="0" min="0"></div>
+    </div>
+    <div class="form-row cols3">
+      <div><div class="label">Exercise done</div><input type="number" id="ch-ex-done" placeholder="0" min="0"></div>
+      <div><div class="label">Step 2 done</div><input type="number" id="ch-s2-done" placeholder="0" min="0"></div>
+      <div><div class="label">Step 3 done</div><input type="number" id="ch-s3-done" placeholder="0" min="0"></div>
+    </div>
+    <div class="form-row"><div><div class="label">Notes</div><textarea id="ch-notes" placeholder="Key concepts, formulas, weak areas..."></textarea></div></div>
+    <div class="flex" style="gap:10px;margin-top:4px">
+      <button class="btn" onclick="saveChapter()">Save Chapter</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let db = JSON.parse(localStorage.getItem('jee_db') || 'null') || {
+  chapters:{Physics:[],Chemistry:[],Mathematics:[]},
+  sessions:[],
+  school:{Physics:{ch:'',idx:0,total:0},Chemistry:{ch:'',idx:0,total:0},Mathematics:{ch:'',idx:0,total:0}},
+  streak:{days:[],last:''},
+  goal:30
+};
+let editingSubject=null,editingIdx=-1;
+let actChart=null;
+
+function save(){localStorage.setItem('jee_db',JSON.stringify(db));}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+
+function nav(page,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  el.classList.add('active');
+  if(page==='overview')renderOverview();
+  if(page==='physics')renderSubjectPage('Physics');
+  if(page==='chemistry')renderSubjectPage('Chemistry');
+  if(page==='math')renderSubjectPage('Mathematics');
+  if(page==='school')renderSchool();
+  if(page==='tracker')renderLog();
+}
+
+function getColor(sub){return sub==='Physics'?'#9c95ff':sub==='Chemistry'?'#00d9a3':'#ff8080';}
+
+function chapterCompletion(ch){
+  const exT=+ch.exTotal||0,s2T=+ch.s2Total||0,s3T=+ch.s3Total||0;
+  const exD=+ch.exDone||0,s2D=+ch.s2Done||0,s3D=+ch.s3Done||0;
+  const tot=exT+s2T+s3T;
+  const done=exD+s2D+s3D;
+  return tot===0?0:Math.round((done/tot)*100);
+}
+
+function renderOverview(){
+  let totDone=0,totTotal=0;
+  ['Physics','Chemistry','Mathematics'].forEach(sub=>{
+    const chs=db.chapters[sub];
+    let subDone=0,subTot=0;
+    chs.forEach(ch=>{subDone+=(+ch.exDone||0)+(+ch.s2Done||0)+(+ch.s3Done||0);subTot+=(+ch.exTotal||0)+(+ch.s2Total||0)+(+ch.s3Total||0);});
+    totDone+=subDone;totTotal+=subTot;
+    const pct=subTot===0?0:Math.round((subDone/subTot)*100);
+    const key=sub==='Physics'?'phy':sub==='Chemistry'?'chem':'math';
+    const bar=document.getElementById('ov-'+key+'-bar');
+    if(bar)bar.style.width=pct+'%';
+    const txt=document.getElementById('ov-'+key+'-txt');
+    const touched=chs.filter(c=>chapterCompletion(c)>0).length;
+    if(txt)txt.textContent=touched+' / '+chs.length+' chapters touched · '+pct+'%';
+  });
+  document.getElementById('ov-total').textContent=db.sessions.reduce((a,s)=>a+(+s.done||0),0);
+  const today=new Date().toISOString().slice(0,10);
+  const todaySess=db.sessions.filter(s=>s.date===today).reduce((a,s)=>a+(+s.done||0),0);
+  document.getElementById('ov-today').textContent=todaySess;
+  document.getElementById('ov-pct').textContent=(totTotal===0?0:Math.round((totDone/totTotal)*100))+'%';
+  document.getElementById('ov-streak').textContent=calcStreak();
+  renderActivityChart();
+  renderFlags();
+}
+
+function calcStreak(){
+  const days=new Set(db.sessions.map(s=>s.date));
+  let streak=0;
+  let d=new Date();
+  while(true){
+    const key=d.toISOString().slice(0,10);
+    if(days.has(key)){streak++;d.setDate(d.getDate()-1);}else break;
+  }
+  return streak;
+}
+
+function renderActivityChart(){
+  const labels=[],data=[];
+  for(let i=6;i>=0;i--){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const key=d.toISOString().slice(0,10);
+    labels.push(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]);
+    data.push(db.sessions.filter(s=>s.date===key).reduce((a,s)=>a+(+s.done||0),0));
+  }
+  if(actChart)actChart.destroy();
+  actChart=new Chart(document.getElementById('actChart'),{type:'bar',data:{labels,datasets:[{label:'Questions',data,backgroundColor:'rgba(108,99,255,.6)',borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b7280'}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b7280',stepSize:5}}}}});
+}
+
+function renderFlags(){
+  const flags=db.sessions.filter(s=>s.flag);
+  const c=document.getElementById('flag-count');
+  c.textContent=flags.length?'('+flags.length+')':'';
+  const el=document.getElementById('flag-list');
+  if(!flags.length){el.innerHTML='<div style="color:var(--muted);font-size:13px">No flagged questions yet.</div>';return;}
+  el.innerHTML=flags.slice(-5).reverse().map(s=>`<div style="padding:10px 0;border-bottom:1px solid rgba(42,45,58,.5)"><div class="flex-between"><span style="font-size:13px;font-weight:600">${s.subject} · ${s.chapter}</span><span class="tag tag-warn">${s.type}</span></div><div style="font-size:12px;color:var(--muted);margin-top:3px">${s.notes||'No notes'} · ${s.date}</div></div>`).join('');
+}
+
+function renderSubjectPage(sub){
+  const key=sub==='Physics'?'phy':sub==='Chemistry'?'chem':'math';
+  const chs=db.chapters[sub];
+  const pageId='page-'+(sub==='Mathematics'?'math':sub.toLowerCase());
+  const container=document.getElementById(sub==='Physics'?'phy-chapters':sub==='Chemistry'?'chem-chapters':'math-chapters');
+  document.getElementById(key+'-total-ch').textContent=chs.length;
+  const avgPct=chs.length===0?0:Math.round(chs.reduce((a,c)=>a+chapterCompletion(c),0)/chs.length);
+  document.getElementById(key+'-avg').textContent=avgPct+'%';
+  if(!chs.length){container.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0">No chapters added yet. Click "Add Chapter" to begin.</div>';return;}
+  const color=getColor(sub);
+  container.innerHTML=chs.map((ch,i)=>{
+    const pct=chapterCompletion(ch);
+    const exT=+ch.exTotal||0,s2T=+ch.s2Total||0,s3T=+ch.s3Total||0;
+    const exD=+ch.exDone||0,s2D=+ch.s2Done||0,s3D=+ch.s3Done||0;
+    const exPct=exT?Math.round((exD/exT)*100):0;
+    const s2Pct=s2T?Math.round((s2D/s2T)*100):0;
+    const s3Pct=s3T?Math.round((s3D/s3T)*100):0;
+    const statusTag=pct===0?'tag-bad':pct<50?'tag-warn':'tag-good';
+    const statusLabel=pct===0?'not started':pct<50?'in progress':'strong';
+    return `<div class="chapter-row">
+      <div>
+        <div class="flex gap8 flex-between">
+          <div class="ch-name">${ch.name}</div>
+          <span class="tag ${statusTag}" style="font-size:10px">${pct}% · ${statusLabel}</span>
+        </div>
+        <div class="q-bars">
+          <div class="q-bar-item"><div class="q-bar-label">Exercise ${exD}/${exT}</div><div class="q-bar-track"><div class="q-bar-fill" style="width:${exPct}%;background:#9c95ff"></div></div></div>
+          <div class="q-bar-item"><div class="q-bar-label">Step 2 ${s2D}/${s2T}</div><div class="q-bar-track"><div class="q-bar-fill" style="width:${s2Pct}%;background:#00d9a3"></div></div></div>
+          <div class="q-bar-item"><div class="q-bar-label">Step 3 ${s3D}/${s3T}</div><div class="q-bar-track"><div class="q-bar-fill" style="width:${s3Pct}%;background:#ffd166"></div></div></div>
+        </div>
+        ${ch.notes?`<div style="font-size:12px;color:var(--muted);margin-top:8px;padding:8px 10px;background:rgba(255,255,255,.03);border-radius:6px;border-left:2px solid ${color}">${ch.notes}</div>`:''}
+      </div>
+      <div class="flex" style="gap:6px;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" onclick="openEditChapter('${sub}',${i})"><i class="ti ti-edit" aria-hidden="true"></i></button>
+        <button class="btn btn-ghost btn-sm" style="border-color:#ff4444;color:#ff8080" onclick="deleteChapter('${sub}',${i})"><i class="ti ti-trash" aria-hidden="true"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openAddChapter(sub){
+  editingSubject=sub;editingIdx=-1;
+  document.getElementById('modal-title').textContent='Add Chapter · '+sub;
+  ['ch-name','ch-ex-total','ch-s2-total','ch-s3-total','ch-ex-done','ch-s2-done','ch-s3-done','ch-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ch-modal').classList.add('open');
+}
+
+function openEditChapter(sub,idx){
+  editingSubject=sub;editingIdx=idx;
+  const ch=db.chapters[sub][idx];
+  document.getElementById('modal-title').textContent='Edit Chapter · '+sub;
+  document.getElementById('ch-name').value=ch.name;
+  document.getElementById('ch-ex-total').value=ch.exTotal||0;
+  document.getElementById('ch-s2-total').value=ch.s2Total||0;
+  document.getElementById('ch-s3-total').value=ch.s3Total||0;
+  document.getElementById('ch-ex-done').value=ch.exDone||0;
+  document.getElementById('ch-s2-done').value=ch.s2Done||0;
+  document.getElementById('ch-s3-done').value=ch.s3Done||0;
+  document.getElementById('ch-notes').value=ch.notes||'';
+  document.getElementById('ch-modal').classList.add('open');
+}
+
+function saveChapter(){
+  const name=document.getElementById('ch-name').value.trim();
+  if(!name){toast('Chapter name required');return;}
+  const ch={name,exTotal:+document.getElementById('ch-ex-total').value||0,s2Total:+document.getElementById('ch-s2-total').value||0,s3Total:+document.getElementById('ch-s3-total').value||0,exDone:+document.getElementById('ch-ex-done').value||0,s2Done:+document.getElementById('ch-s2-done').value||0,s3Done:+document.getElementById('ch-s3-done').value||0,notes:document.getElementById('ch-notes').value.trim()};
+  if(editingIdx===-1)db.chapters[editingSubject].push(ch);
+  else db.chapters[editingSubject][editingIdx]=ch;
+  save();closeModal();
+  renderSubjectPage(editingSubject);
+  toast('Chapter saved!');
+  updateLogChapterDropdown();
+}
+
+function deleteChapter(sub,idx){
+  if(!confirm('Delete this chapter?'))return;
+  db.chapters[sub].splice(idx,1);save();renderSubjectPage(sub);toast('Deleted');
+}
+
+function closeModal(){document.getElementById('ch-modal').classList.remove('open');}
+
+document.getElementById('log-sub').addEventListener('change',updateLogChapterDropdown);
+function updateLogChapterDropdown(){
+  const sub=document.getElementById('log-sub').value;
+  const sel=document.getElementById('log-ch');
+  const chs=db.chapters[sub];
+  sel.innerHTML=chs.length?chs.map(c=>`<option>${c.name}</option>`).join(''):'<option>— add chapters first —</option>';
+}
+
+function logSession(){
+  const sub=document.getElementById('log-sub').value;
+  const ch=document.getElementById('log-ch').value;
+  const type=document.getElementById('log-type').value;
+  const done=+document.getElementById('log-done').value||0;
+  const correct=+document.getElementById('log-correct').value||0;
+  const flag=document.getElementById('log-flag').value==='1';
+  const notes=document.getElementById('log-notes').value.trim();
+  if(!ch||ch==='— add chapters first —'){toast('Please add chapters first');return;}
+  if(done===0){toast('Enter questions done');return;}
+  const sess={date:new Date().toISOString().slice(0,10),subject:sub,chapter:ch,type,done,correct,flag,notes};
+  db.sessions.push(sess);
+  const chIdx=db.chapters[sub].findIndex(c=>c.name===ch);
+  if(chIdx>=0){
+    const chObj=db.chapters[sub][chIdx];
+    if(type==='Exercise')chObj.exDone=Math.min((+chObj.exDone||0)+done,+chObj.exTotal||done);
+    else if(type==='Step 2')chObj.s2Done=Math.min((+chObj.s2Done||0)+done,+chObj.s2Total||done);
+    else chObj.s3Done=Math.min((+chObj.s3Done||0)+done,+chObj.s3Total||done);
+  }
+  save();renderLog();toast('Session logged!');
+  ['log-done','log-correct','log-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('log-flag').value='0';
+}
+
+function renderLog(){
+  const tbody=document.getElementById('log-body');
+  if(!db.sessions.length){tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);padding:20px 12px">No sessions logged yet.</td></tr>';return;}
+  tbody.innerHTML=db.sessions.slice().reverse().map((s,i)=>{
+    const acc=s.done>0?Math.round((s.correct/s.done)*100):0;
+    return `<tr>
+      <td style="color:var(--muted)">${s.date}</td>
+      <td><span class="tag ${s.subject==='Physics'?'tag-p':s.subject==='Chemistry'?'tag-c':'tag-m'}">${s.subject.slice(0,4).toUpperCase()}</span></td>
+      <td style="font-weight:600">${s.chapter}</td>
+      <td style="color:var(--muted)">${s.type}</td>
+      <td style="font-weight:700">${s.done}</td>
+      <td><span style="color:${acc>=70?'var(--accent2)':acc>=40?'var(--accent4)':'var(--accent3)'}">${s.correct}/${s.done} (${acc}%)</span></td>
+      <td style="color:var(--muted);font-size:12px">${s.flag?'🔴 ':''}${s.notes||'—'}</td>
+      <td></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderSchool(){
+  const container=document.getElementById('race-cards');
+  const subs=['Physics','Chemistry','Mathematics'];
+  container.innerHTML=subs.map(sub=>{
+    const sc=db.school[sub];
+    const chs=db.chapters[sub];
+    const youPct=chs.length===0?0:Math.round(chs.reduce((a,c)=>a+chapterCompletion(c),0)/chs.length);
+    const totalChs=chs.length||10;
+    const schoolPct=sc.idx>0?Math.min(Math.round((sc.idx/totalChs)*100),100):0;
+    const color=getColor(sub);
+    const ahead=youPct>schoolPct;
+    return `<div class="card" style="margin-bottom:14px">
+      <div class="flex-between" style="margin-bottom:12px">
+        <div style="font-size:15px;font-weight:700">${sub}</div>
+        <span class="tag ${ahead?'tag-good':'tag-bad'}">${ahead?'You\'re ahead':'School ahead'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px">
+        <div><div class="stat-label">Your progress</div><div style="font-size:22px;font-weight:800;color:${color}">${youPct}%</div></div>
+        <div><div class="stat-label">School at</div><div style="font-size:22px;font-weight:800;color:var(--accent4)">${sc.ch||'Not set'}</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:700;letter-spacing:1px">YOU</div>
+      <div class="race-bar" style="margin-bottom:8px"><div class="race-you" style="width:${youPct}%;background:${color}">${youPct>8?youPct+'%':''}</div>${sc.idx>0?`<div class="race-school" style="left:${schoolPct}%;height:32px"></div>`:''}</div>
+      <div style="font-size:11px;color:var(--muted)">Yellow line = school position · ${sc.idx>0?'Chapter '+sc.idx+' of '+totalChs:'Not set'}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateSchool(){
+  const sub=document.getElementById('sch-sub').value;
+  const ch=document.getElementById('sch-chapter').value.trim();
+  const idx=+document.getElementById('sch-idx').value||0;
+  if(!ch){toast('Enter chapter name');return;}
+  db.school[sub]={ch,idx,total:db.chapters[sub].length||10};
+  save();renderSchool();toast('School progress updated!');
+}
+
+function saveGoal(){
+  db.goal=+document.getElementById('daily-goal').value||30;save();
+}
+
+function exportData(){
+  const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='jee_data.json';a.click();
+}
+
+function importData(){
+  const input=document.createElement('input');input.type='file';input.accept='.json';
+  input.onchange=e=>{const r=new FileReader();r.onload=ev=>{try{db=JSON.parse(ev.target.result);save();toast('Data imported!');renderOverview();}catch(err){toast('Invalid JSON file');}};r.readAsText(e.target.files[0]);};
+  input.click();
+}
+
+function resetData(){
+  if(!confirm('Reset ALL data? This cannot be undone.'))return;
+  db={chapters:{Physics:[],Chemistry:[],Mathematics:[]},sessions:[],school:{Physics:{ch:'',idx:0,total:0},Chemistry:{ch:'',idx:0,total:0},Mathematics:{ch:'',idx:0,total:0}},streak:{days:[],last:''},goal:30};
+  save();renderOverview();toast('Data reset');
+}
+
+document.getElementById('daily-goal').value=db.goal||30;
+updateLogChapterDropdown();
+renderOverview();
+</script>
