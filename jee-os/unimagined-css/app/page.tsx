@@ -12,9 +12,10 @@ import { Toast } from '@/components/jee-os/toast'
 import { useAuth } from '@/components/auth-provider'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db, logout } from '@/lib/firebase'
-import type { AppData, AppSettings, Chapter, DoubtLog, NoteLog, ProgressLog, Subject, TipLog } from '@/lib/jee-os/types'
+import type { AppData, AppSettings, Chapter, DoubtLog, NoteLog, ProgressLog, Subject, TipLog, DailySummary } from '@/lib/jee-os/types'
 
 const COLLECTION_NAME = 'user-data'
+const LOCAL_STORAGE_KEY = 'jee-os-data'
 
 const initialSettings: AppSettings = {
   excludeStep3FromCalculations: false
@@ -30,6 +31,7 @@ const initialData: AppData = {
   tipLogs: [],
   noteLogs: [],
   doubtLogs: [],
+  dailySummaries: [],
   schoolProgress: {
     Physics: { chapter: '', index: 0 },
     Chemistry: { chapter: '', index: 0 },
@@ -81,12 +83,10 @@ const normalizeChapter = (chapter: Chapter): Chapter => ({
   step3Sections: chapter.step3Sections ?? {}
 })
 
-// Recalculate chapter done counts from progress logs to ensure consistency
 const recalculateChapterProgress = (data: AppData): AppData => {
   const recalculated = { ...data }
   const chaptersBySubject = { ...data.subjects }
   
-  // Reset all done counts first
   ;(['Physics', 'Chemistry', 'Mathematics'] as Subject[]).forEach(subject => {
     chaptersBySubject[subject] = chaptersBySubject[subject].map(ch => ({
       ...ch,
@@ -99,7 +99,6 @@ const recalculateChapterProgress = (data: AppData): AppData => {
     }))
   })
   
-  // Recalculate from logs
   data.progressLogs.forEach(log => {
     const chapters = [...chaptersBySubject[log.subject]]
     const idx = chapters.findIndex(c => c.name === log.chapter)
@@ -143,6 +142,7 @@ const normalizeData = (raw: Partial<AppData>): AppData => ({
   tipLogs: raw.tipLogs ?? [],
   noteLogs: raw.noteLogs ?? [],
   doubtLogs: raw.doubtLogs ?? [],
+  dailySummaries: raw.dailySummaries ?? [],
   settings: {
     ...initialSettings,
     ...(raw.settings || {})
@@ -156,52 +156,88 @@ export default function JeeOSPage() {
   const [activePage, setActivePage] = useState('overview')
   const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false })
   const [isLoaded, setIsLoaded] = useState(false)
-  const [isSyncing, setIsSyncing] = useState(false)
 
-  // Check if Firebase is configured
   const firebaseEnabled = !!(
     process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
     process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN &&
     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
   )
 
-  // Redirect to login if not authenticated and Firebase is enabled
   useEffect(() => {
     if (firebaseEnabled && !authLoading && !user) {
       router.push('/login')
     }
   }, [user, authLoading, firebaseEnabled, router])
 
-  // Load data from Firestore when user logs in
   useEffect(() => {
     const loadData = async () => {
       if (!user) {
-        // No user, use initial data
-        setData(initialData)
+        const local = localStorage.getItem(LOCAL_STORAGE_KEY)
+        if (local) {
+          try {
+            const parsed = JSON.parse(local)
+            setData(normalizeData(parsed))
+          } catch {
+            setData(initialData)
+          }
+        } else {
+          setData(initialData)
+        }
         setIsLoaded(true)
         return
       }
 
-      try {
+try {
         const userDocRef = doc(db, COLLECTION_NAME, user.uid)
         const docSnap = await getDoc(userDocRef)
-        
-if (docSnap.exists()) {
+
+        if (docSnap.exists()) {
            const storedData = docSnap.data().data as AppData
            const normalized = normalizeData(storedData)
            setData(recalculateChapterProgress(normalized))
+           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(normalized))
          } else {
-          // First time user, create empty document
-          await setDoc(userDocRef, {
-            data: initialData,
-            lastSyncedAt: serverTimestamp(),
-            version: 1,
-          })
-          setData(initialData)
-        }
+           const local = localStorage.getItem(LOCAL_STORAGE_KEY)
+           if (local) {
+             try {
+               const parsed = JSON.parse(local)
+               const normalized = normalizeData(parsed)
+               setData(recalculateChapterProgress(normalized))
+               await setDoc(userDocRef, {
+                 data: normalized,
+                 lastSyncedAt: serverTimestamp(),
+                 version: 1,
+               })
+               showToast('Data synced from browser backup to cloud')
+             } catch {
+               setData(initialData)
+               await setDoc(userDocRef, {
+                 data: initialData,
+                 lastSyncedAt: serverTimestamp(),
+                 version: 1,
+               })
+             }
+           } else {
+             setData(initialData)
+             await setDoc(userDocRef, {
+               data: initialData,
+               lastSyncedAt: serverTimestamp(),
+               version: 1,
+             })
+           }
+         }
       } catch (error) {
         console.error('Error loading data from Firestore:', error)
-        setData(initialData)
+        const local = localStorage.getItem(LOCAL_STORAGE_KEY)
+        if (local) {
+          try {
+            const parsed = JSON.parse(local)
+            setData(normalizeData(parsed))
+            showToast('Loaded from browser backup (cloud sync failed)')
+          } catch {
+            setData(initialData)
+          }
+        }
       }
 
       setIsLoaded(true)
@@ -210,7 +246,6 @@ if (docSnap.exists()) {
     loadData()
   }, [user])
 
-  // Save data to Firestore (debounced)
   useEffect(() => {
     if (!isLoaded || !user || !firebaseEnabled) return
 
@@ -225,12 +260,15 @@ if (docSnap.exists()) {
       } catch (error) {
         console.error('Error saving to Firestore:', error)
       }
-    }, 100) // Shorter debounce for more responsive saves
+    }, 100)
 
     return () => clearTimeout(timeoutId)
   }, [data, isLoaded, user, firebaseEnabled])
 
-  // Flush Firestore save on page unload/visibility change
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data))
+  }, [data])
+
   useEffect(() => {
     if (!firebaseEnabled || !user) return
 
@@ -380,10 +418,8 @@ if (docSnap.exists()) {
         } else if (normalizedLog.type === 'Step 2') {
           chapter.step2Done = Math.min(chapter.step2Total, chapter.step2Done + normalizedLog.solved)
         } else if (normalizedLog.type === 'Step 3') {
-          // For Step 3: use the original solved value (log.step3Question), not the adjusted one
           const step3Solved = normalizedLog.step3Question ?? normalizedLog.solved
           chapter.step3Done = Math.min(chapter.step3Total, chapter.step3Done + step3Solved)
-          // Update section totals if available
           if (normalizedLog.step3Section) {
             chapter.step3Sections = { ...(chapter.step3Sections || {}) }
             if (normalizedLog.step3TotalInSection) {
@@ -470,6 +506,99 @@ if (docSnap.exists()) {
     return true
   }, [showToast])
 
+  const addDailySummary = useCallback((summary: DailySummary) => {
+    if (!summary.summary.trim()) {
+      showToast('Summary cannot be empty')
+      return false
+    }
+    setData(prev => ({
+      ...prev,
+      dailySummaries: [summary, ...prev.dailySummaries]
+    }))
+    showToast('Daily summary saved')
+    return true
+  }, [showToast])
+
+  const updateDailySummary = useCallback((summary: DailySummary) => {
+    setData(prev => ({
+      ...prev,
+      dailySummaries: prev.dailySummaries.map(s => s.id === summary.id ? summary : s)
+    }))
+    showToast('Summary updated')
+  }, [showToast])
+
+  const deleteDailySummary = useCallback((summaryId: string) => {
+    setData(prev => ({
+      ...prev,
+      dailySummaries: prev.dailySummaries.filter(s => s.id !== summaryId)
+    }))
+    showToast('Summary deleted')
+  }, [showToast])
+
+  const updateProgressLog = useCallback((log: ProgressLog) => {
+    setData(prev => ({
+      ...prev,
+      progressLogs: prev.progressLogs.map(l => l.id === log.id ? log : l)
+    }))
+    showToast('Progress log updated')
+  }, [showToast])
+
+  const deleteProgressLog = useCallback((logId: string) => {
+    setData(prev => ({
+      ...prev,
+      progressLogs: prev.progressLogs.filter(l => l.id !== logId)
+    }))
+    showToast('Progress log deleted')
+  }, [showToast])
+
+  const updateTipLog = useCallback((tip: TipLog) => {
+    setData(prev => ({
+      ...prev,
+      tipLogs: prev.tipLogs.map(t => t.id === tip.id ? tip : t)
+    }))
+    showToast('Tip updated')
+  }, [showToast])
+
+  const deleteTipLog = useCallback((tipId: string) => {
+    setData(prev => ({
+      ...prev,
+      tipLogs: prev.tipLogs.filter(t => t.id !== tipId)
+    }))
+    showToast('Tip deleted')
+  }, [showToast])
+
+  const updateNoteLog = useCallback((note: NoteLog) => {
+    setData(prev => ({
+      ...prev,
+      noteLogs: prev.noteLogs.map(n => n.id === note.id ? note : n)
+    }))
+    showToast('Note updated')
+  }, [showToast])
+
+  const deleteNoteLog = useCallback((noteId: string) => {
+    setData(prev => ({
+      ...prev,
+      noteLogs: prev.noteLogs.filter(n => n.id !== noteId)
+    }))
+    showToast('Note deleted')
+  }, [showToast])
+
+  const updateDoubtLog = useCallback((doubt: DoubtLog) => {
+    setData(prev => ({
+      ...prev,
+      doubtLogs: prev.doubtLogs.map(d => d.id === doubt.id ? doubt : d)
+    }))
+    showToast('Doubt log updated')
+  }, [showToast])
+
+  const deleteDoubtLog = useCallback((doubtId: string) => {
+    setData(prev => ({
+      ...prev,
+      doubtLogs: prev.doubtLogs.filter(d => d.id !== doubtId)
+    }))
+    showToast('Doubt log deleted')
+  }, [showToast])
+
   const updateSchoolProgress = useCallback((subject: Subject, chapter: string, index: number) => {
     setData(prev => ({
       ...prev,
@@ -504,15 +633,14 @@ if (docSnap.exists()) {
       const recalculated = recalculateChapterProgress(normalizedImported)
       setData(recalculated)
       
-// Immediately save to Firestore
-       if (user && firebaseEnabled) {
-         try {
-           const userDocRef = doc(db, COLLECTION_NAME, user.uid)
-           await setDoc(userDocRef, {
-             data: recalculated,
-             lastSyncedAt: serverTimestamp(),
-             version: 1,
-           }, { merge: true })
+      if (user && firebaseEnabled) {
+        try {
+          const userDocRef = doc(db, COLLECTION_NAME, user.uid)
+          await setDoc(userDocRef, {
+            data: recalculated,
+            lastSyncedAt: serverTimestamp(),
+            version: 1,
+          }, { merge: true })
           showToast('Data imported and saved to cloud!')
         } catch (error) {
           console.error('Error saving imported data:', error)
@@ -529,8 +657,8 @@ if (docSnap.exists()) {
   const resetData = useCallback(async () => {
     if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
       setData(initialData)
+      localStorage.removeItem(LOCAL_STORAGE_KEY)
       
-      // Also reset in Firestore
       if (user && firebaseEnabled) {
         try {
           const userDocRef = doc(db, COLLECTION_NAME, user.uid)
@@ -548,7 +676,6 @@ if (docSnap.exists()) {
     }
   }, [user, firebaseEnabled, showToast])
 
-  // Calculate analytics
   const analytics = {
     totalQuestions: data.settings?.excludeStep3FromCalculations 
       ? data.progressLogs.filter(log => log.type !== 'Step 3').reduce((sum, log) => sum + log.solved, 0)
@@ -572,7 +699,6 @@ if (docSnap.exists()) {
     excludeStep3: data.settings?.excludeStep3FromCalculations ?? false
   }
 
-  // Show loading state
   if (authLoading || !isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -584,7 +710,6 @@ if (docSnap.exists()) {
     )
   }
 
-  // If Firebase is enabled and user is not logged in, don't render (will redirect)
   if (firebaseEnabled && !user) {
     return null
   }
@@ -614,6 +739,17 @@ if (docSnap.exists()) {
               addTipLog={addTipLog}
               addNoteLog={addNoteLog}
               addDoubtLog={addDoubtLog}
+              updateProgressLog={updateProgressLog}
+              deleteProgressLog={deleteProgressLog}
+              updateTipLog={updateTipLog}
+              deleteTipLog={deleteTipLog}
+              updateNoteLog={updateNoteLog}
+              deleteNoteLog={deleteNoteLog}
+              updateDoubtLog={updateDoubtLog}
+              deleteDoubtLog={deleteDoubtLog}
+              addDailySummary={addDailySummary}
+              updateDailySummary={updateDailySummary}
+              deleteDailySummary={deleteDailySummary}
             />
           )}
           

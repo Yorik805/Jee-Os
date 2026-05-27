@@ -1,8 +1,8 @@
 ﻿'use client'
 
 import { useState } from 'react'
-import { BookOpen, Plus, Clock, AlertTriangle, Check, Edit2, Trash2 } from 'lucide-react'
-import type { AppData, DoubtLog, ProgressLog, Subject, TipLog, NoteLog } from '@/lib/jee-os/types'
+import { BookOpen, Plus, Clock, AlertTriangle, Check, Edit2, Trash2, FileText } from 'lucide-react'
+import type { AppData, DoubtLog, ProgressLog, Subject, TipLog, NoteLog, DailySummary } from '@/lib/jee-os/types'
 
 interface TrackerPageProps {
   data: AppData
@@ -18,9 +18,17 @@ interface TrackerPageProps {
   deleteNoteLog?: (noteId: string) => void
   updateDoubtLog?: (doubt: DoubtLog) => void
   deleteDoubtLog?: (doubtId: string) => void
+  addDailySummary?: (summary: DailySummary) => boolean
+  updateDailySummary?: (summary: DailySummary) => void
+  deleteDailySummary?: (summaryId: string) => void
 }
 
-export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubtLog }: TrackerPageProps) {
+export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubtLog, addDailySummary, updateDailySummary, deleteDailySummary, updateProgressLog, deleteProgressLog, updateTipLog, deleteTipLog, updateNoteLog, deleteNoteLog, updateDoubtLog, deleteDoubtLog }: TrackerPageProps) {
+  const [editingProgressId, setEditingProgressId] = useState<string | null>(null)
+  const [editingTipId, setEditingTipId] = useState<string | null>(null)
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [editingDoubtId, setEditingDoubtId] = useState<string | null>(null)
+  const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     subject: 'Physics' as Subject,
     chapter: '',
@@ -31,27 +39,35 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
     notes: '',
     flagged: false,
     step3Section: '',
-    step3TotalInSection: 0
+    step3TotalInSection: 0,
+    date: ''
   })
   const [tipData, setTipData] = useState({
     subject: 'Physics' as Subject,
     chapter: '',
     type: 'Exercise' as 'Exercise' | 'Step 2' | 'Step 3',
     questionTags: '',
-    prompt: ''
+    prompt: '',
+    date: ''
   })
   const [noteData, setNoteData] = useState({
     subject: 'Physics' as Subject,
     chapter: '',
     notesProgress: 0,
-    noteText: ''
+    noteText: '',
+    date: ''
   })
   const [doubtLogData, setDoubtLogData] = useState({
     subject: 'Physics' as Subject,
     chapter: '',
     doubtQuestion: '',
     resolved: false,
-    note: ''
+    note: '',
+    date: ''
+  })
+  const [summaryData, setSummaryData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    summary: ''
   })
 
   const chapters = data.subjects[formData.subject]
@@ -74,10 +90,8 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
 
     const attempted = formData.rangeEnd - formData.rangeStart + 1
     const doubtList = parseDoubts(formData.doubts)
-    // Auto-calculate solved: range size minus doubts
     const solved = attempted - doubtList.length
 
-    // For Step 3: calculate the adjusted question number based on sections
     const chapter = data.subjects[formData.subject].find(c => c.name === formData.chapter)
     const existingSections = chapter?.step3Sections || {}
 
@@ -85,7 +99,6 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
     let adjustedRangeStart = formData.rangeStart
     let adjustedRangeEnd = formData.rangeEnd
 
-    // If this is Step 3 and we have section info
     if (formData.type === 'Step 3' && formData.step3Section && chapter) {
       const sectionLetters = 'abcde'
       let previousTotal = 0
@@ -100,8 +113,8 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
     }
 
     const log: ProgressLog = {
-      id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
+      id: editingProgressId ?? Date.now().toString(),
+      date: editingProgressId ? formData.date || new Date().toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       subject: formData.subject,
       chapter: formData.chapter,
       type: formData.type,
@@ -120,66 +133,104 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
       step3TotalInSection: formData.type === 'Step 3' ? formData.step3TotalInSection : undefined
     }
 
-    const ok = logProgress(log)
-    if (!ok) return
+    if (editingProgressId) {
+      updateProgressLog?.(log)
+      setEditingProgressId(null)
+    } else {
+      const ok = logProgress(log)
+      if (!ok) return
 
-    setFormData(prev => ({
-      ...prev,
-      rangeStart: prev.rangeEnd + 1,
-      rangeEnd: prev.rangeEnd + 10,
-      doubts: '',
-      notes: '',
-      flagged: false,
-      step3Section: '',
-      step3TotalInSection: 0
-    }))
+      setFormData(prev => ({
+        ...prev,
+        rangeStart: prev.rangeEnd + 1,
+        rangeEnd: prev.rangeEnd + 10,
+        doubts: '',
+        notes: '',
+        flagged: false,
+        step3Section: '',
+        step3TotalInSection: 0
+      }))
+    }
   }
 
   const handleTipSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const tip: TipLog = {
-      id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
+      id: editingTipId ?? Date.now().toString(),
+      date: tipData.date || new Date().toISOString().split('T')[0],
       subject: tipData.subject,
       chapter: tipData.chapter,
       type: tipData.type,
       questionTags: tipData.questionTags.trim(),
       prompt: tipData.prompt.trim()
     }
-    const ok = addTipLog(tip)
-    if (!ok) return
-    setTipData(prev => ({ ...prev, questionTags: '', prompt: '' }))
+    if (editingTipId) {
+      updateTipLog?.(tip)
+      setEditingTipId(null)
+    } else {
+      const ok = addTipLog(tip)
+      if (!ok) return
+      setTipData(prev => ({ ...prev, questionTags: '', prompt: '' }))
+    }
   }
 
   const handleNoteSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const note: NoteLog = {
-      id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
+      id: editingNoteId ?? Date.now().toString(),
+      date: noteData.date || new Date().toISOString().split('T')[0],
       subject: noteData.subject,
       chapter: noteData.chapter,
       notesProgress: noteData.notesProgress,
       noteText: noteData.noteText.trim()
     }
-    const ok = addNoteLog(note)
-    if (!ok) return
-    setNoteData(prev => ({ ...prev, notesProgress: 0, noteText: '' }))
+    if (editingNoteId) {
+      updateNoteLog?.(note)
+      setEditingNoteId(null)
+    } else {
+      const ok = addNoteLog(note)
+      if (!ok) return
+      setNoteData(prev => ({ ...prev, notesProgress: 0, noteText: '' }))
+    }
   }
 
   const handleDoubtLogSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const doubt: DoubtLog = {
-      id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
+      id: editingDoubtId ?? Date.now().toString(),
+      date: doubtLogData.date || new Date().toISOString().split('T')[0],
       subject: doubtLogData.subject,
       chapter: doubtLogData.chapter,
       doubtQuestion: doubtLogData.doubtQuestion.trim(),
       resolved: doubtLogData.resolved,
       note: doubtLogData.note.trim()
     }
-    const ok = addDoubtLog(doubt)
-    if (!ok) return
-    setDoubtLogData(prev => ({ ...prev, doubtQuestion: '', resolved: false, note: '' }))
+    if (editingDoubtId) {
+      updateDoubtLog?.(doubt)
+      setEditingDoubtId(null)
+    } else {
+      const ok = addDoubtLog(doubt)
+      if (!ok) return
+      setDoubtLogData(prev => ({ ...prev, doubtQuestion: '', resolved: false, note: '' }))
+    }
+  }
+
+  const handleSummarySubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const summary: DailySummary = {
+      id: editingSummaryId ?? Date.now().toString(),
+      date: summaryData.date,
+      summary: summaryData.summary.trim()
+    }
+    if (summary.summary) {
+      if (editingSummaryId) {
+        updateDailySummary?.(summary)
+        setEditingSummaryId(null)
+      } else {
+        addDailySummary?.(summary)
+      }
+      setSummaryData({ date: new Date().toISOString().split('T')[0], summary: '' })
+    }
   }
 
   return (
@@ -196,7 +247,6 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
         </div>
       </div>
 
-      {/* Progress History - moved to top with fixed height */}
       <div className="glass-card p-6 animate-entrance animate-entrance-2">
         <div className="flex items-center gap-2 mb-6">
           <Clock className="w-4 h-4 text-[var(--neon-cyan)]" />
@@ -223,6 +273,7 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
                   <th>Left</th>
                   <th>Doubts</th>
                   <th>Notes</th>
+                  <th className="w-20">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -244,6 +295,48 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
                     <td className="font-mono text-[var(--neon-red)]">{log.left}</td>
                     <td className="font-mono text-xs text-[var(--neon-amber)]">{log.doubts || '-'}</td>
                     <td className="text-xs text-[var(--text-muted)] max-w-[200px] truncate">{log.notes || '-'}</td>
+                    <td>
+                      <div className="flex items-center gap-1">
+                        {updateProgressLog && (
+                          <button
+                            onClick={() => {
+                              setEditingProgressId(log.id)
+                              setFormData({
+                                ...formData,
+                                subject: log.subject,
+                                chapter: log.chapter,
+                                type: log.type as 'Exercise' | 'Step 2' | 'Step 3',
+                                rangeStart: log.rangeStart,
+                                rangeEnd: log.rangeEnd,
+                                doubts: log.doubts,
+                                notes: log.notes || '',
+                                flagged: log.flagged,
+                                step3Section: log.step3Section || '',
+                                step3TotalInSection: log.step3TotalInSection || 0,
+                                date: log.date
+                              })
+                            }}
+                            className="p-1 rounded hover:bg-[var(--void-elevated)]"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-3 h-3 text-[var(--neon-purple)]" />
+                          </button>
+                        )}
+                        {deleteProgressLog && (
+                          <button
+                            onClick={() => {
+                              if (confirm('Delete this log?')) {
+                                deleteProgressLog(log.id)
+                              }
+                            }}
+                            className="p-1 rounded hover:bg-[var(--neon-red)]/20"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3 h-3 text-[var(--neon-red)]" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -252,7 +345,6 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
         )}
       </div>
 
-      {/* Log Progress */}
       <div className="glass-card p-6 animate-entrance animate-entrance-1">
         <div className="flex items-center gap-2 mb-6">
           <Plus className="w-4 h-4 text-[var(--neon-purple)]" />
@@ -400,11 +492,10 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
             />
           </label>
 
-          <button type="submit" className="btn-neon w-full md:w-auto">Save Progress</button>
+          <button type="submit" className="btn-neon w-full md:w-auto">{editingProgressId ? 'Update Progress' : 'Save Progress'}</button>
         </form>
       </div>
 
-      {/* Tip Log */}
       <div className="glass-card p-6 animate-entrance animate-entrance-3">
         <div className="flex items-center gap-2 mb-6">
           <Plus className="w-4 h-4 text-[var(--neon-pink)]" />
@@ -480,21 +571,34 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
           {data.tipLogs.length === 0 ? (
             <p className="text-sm text-[var(--text-ghost)]">No tips saved yet.</p>
           ) : data.tipLogs.slice(0, 20).map((tip) => (
-            <div key={tip.id} className="p-3 rounded-lg bg-[var(--void-surface)] border border-[var(--border-subtle)]">
-              <div className="flex items-center gap-2 mb-1 text-xs text-[var(--text-muted)]">
-                <span>{tip.date}</span>
-                <span>{tip.subject}</span>
-                <span>{tip.chapter}</span>
-                <span>{tip.type}</span>
+            <div key={tip.id} className="p-3 rounded-lg bg-[var(--void-surface)] border border-[var(--border-subtle)] flex justify-between items-start">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1 text-xs text-[var(--text-muted)]">
+                  <span>{tip.date}</span>
+                  <span>{tip.subject}</span>
+                  <span>{tip.chapter}</span>
+                  <span>{tip.type}</span>
+                </div>
+                <div className="text-sm text-[var(--text-primary)] mb-1">{tip.prompt}</div>
+                <div className="text-xs font-mono text-[var(--neon-amber)]">{tip.questionTags || '-'}</div>
               </div>
-              <div className="text-sm text-[var(--text-primary)] mb-1">{tip.prompt}</div>
-              <div className="text-xs font-mono text-[var(--neon-amber)]">{tip.questionTags || '-'}</div>
+              <div className="flex gap-1">
+                {updateTipLog && (
+                  <button onClick={() => { setEditingTipId(tip.id); setTipData({ ...tipData, ...tip, date: tip.date }) }} className="p-1 rounded hover:bg-[var(--void-elevated)]" title="Edit">
+                    <Edit2 className="w-3 h-3 text-[var(--neon-purple)]" />
+                  </button>
+                )}
+                {deleteTipLog && (
+                  <button onClick={() => { if (confirm('Delete this tip?')) deleteTipLog(tip.id) }} className="p-1 rounded hover:bg-[var(--neon-red)]/20" title="Delete">
+                    <Trash2 className="w-3 h-3 text-[var(--neon-red)]" />
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Doubt Log */}
       <div className="glass-card p-6 animate-entrance animate-entrance-4">
         <div className="flex items-center gap-2 mb-6">
           <AlertTriangle className="w-4 h-4 text-[var(--neon-amber)]" />
@@ -571,23 +675,36 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
         <div className="space-y-3 max-h-[280px] overflow-y-auto">
           {'doubtLogs' in data && data.doubtLogs && data.doubtLogs.length > 0 
             ? data.doubtLogs.slice(0, 20).map((d) => (
-              <div key={d.id} className="p-3 rounded-lg bg-[var(--void-surface)] border border-[var(--border-subtle)]">
-                <div className="flex items-center gap-2 mb-1 text-xs text-[var(--text-muted)]">
-                  <span>{d.date}</span>
-                  <span>{d.subject}</span>
-                  <span>{d.chapter}</span>
-                  <span>Q{d.doubtQuestion}</span>
-                  {d.resolved && <Check className="w-3 h-3 text-[var(--neon-green)]" />}
+              <div key={d.id} className="p-3 rounded-lg bg-[var(--void-surface)] border border-[var(--border-subtle)] flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1 text-xs text-[var(--text-muted)]">
+                    <span>{d.date}</span>
+                    <span>{d.subject}</span>
+                    <span>{d.chapter}</span>
+                    <span>Q{d.doubtQuestion}</span>
+                    {d.resolved && <Check className="w-3 h-3 text-[var(--neon-green)]" />}
+                  </div>
+                  <div className="text-sm text-[var(--text-primary)]">{d.note || '-'}</div>
                 </div>
-                <div className="text-sm text-[var(--text-primary)]">{d.note || '-'}</div>
-              </div>
-            ))
-            : <p className="text-sm text-[var(--text-ghost)]">No doubt logs saved yet.</p>
-          }
+<div className="flex gap-1">
+                   {updateDoubtLog && (
+                     <button onClick={() => { setEditingDoubtId(d.id); setDoubtLogData({ ...doubtLogData, ...d }) }} className="p-1 rounded hover:bg-[var(--void-elevated)]" title="Edit">
+                       <Edit2 className="w-3 h-3 text-[var(--neon-purple)]" />
+                     </button>
+                   )}
+                   {deleteDoubtLog && (
+                     <button onClick={() => { if (confirm('Delete this doubt?')) deleteDoubtLog(d.id) }} className="p-1 rounded hover:bg-[var(--neon-red)]/20" title="Delete">
+                       <Trash2 className="w-3 h-3 text-[var(--neon-red)]" />
+                     </button>
+                   )}
+                 </div>
+               </div>
+             ))
+             : <p className="text-sm text-[var(--text-ghost)]">No doubt logs saved yet.</p>
+           }
         </div>
       </div>
 
-      {/* Note Log */}
       <div className="glass-card p-6 animate-entrance animate-entrance-5">
         <div className="flex items-center gap-2 mb-6">
           <Plus className="w-4 h-4 text-[var(--neon-green)]" />
@@ -650,16 +767,82 @@ export function TrackerPage({ data, logProgress, addTipLog, addNoteLog, addDoubt
           {data.noteLogs.length === 0 ? (
             <p className="text-sm text-[var(--text-ghost)]">No notes logged yet.</p>
           ) : data.noteLogs.slice(0, 20).map((n) => (
-            <div key={n.id} className="p-3 rounded-lg bg-[var(--void-surface)] border border-[var(--border-subtle)]">
-              <div className="flex items-center gap-2 mb-1 text-xs text-[var(--text-muted)]">
-                <span>{n.date}</span>
-                <span>{n.subject}</span>
-                <span>{n.chapter}</span>
+            <div key={n.id} className="p-3 rounded-lg bg-[var(--void-surface)] border border-[var(--border-subtle)] flex justify-between items-start">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1 text-xs text-[var(--text-muted)]">
+                  <span>{n.date}</span>
+                  <span>{n.subject}</span>
+                  <span>{n.chapter}</span>
+                </div>
+                <div className="text-sm text-[var(--text-primary)] mb-1">{n.noteText || '-'}</div>
+                <div className="text-xs font-mono text-[var(--neon-green)]">{n.notesProgress}% notes done</div>
               </div>
-              <div className="text-sm text-[var(--text-primary)] mb-1">{n.noteText || '-'}</div>
-              <div className="text-xs font-mono text-[var(--neon-green)]">{n.notesProgress}% notes done</div>
+              <div className="flex gap-1">
+                {updateNoteLog && (
+                  <button onClick={() => { setEditingNoteId(n.id); setNoteData({ ...noteData, ...n }) }} className="p-1 rounded hover:bg-[var(--void-elevated)]" title="Edit">
+                    <Edit2 className="w-3 h-3 text-[var(--neon-purple)]" />
+                  </button>
+                )}
+                {deleteNoteLog && (
+                  <button onClick={() => { if (confirm('Delete this note?')) deleteNoteLog(n.id) }} className="p-1 rounded hover:bg-[var(--neon-red)]/20" title="Delete">
+                    <Trash2 className="w-3 h-3 text-[var(--neon-red)]" />
+                  </button>
+                )}
+              </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="glass-card p-6 animate-entrance animate-entrance-6">
+        <div className="flex items-center gap-2 mb-6">
+          <FileText className="w-4 h-4 text-[var(--neon-cyan)]" />
+          <span className="text-sm font-semibold text-[var(--text-primary)]">Daily Summaries</span>
+        </div>
+
+        <form onSubmit={handleSummarySubmit} className="space-y-3 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input
+              type="date"
+              value={summaryData.date}
+              onChange={e => setSummaryData(prev => ({ ...prev, date: e.target.value }))}
+              className="input-void font-mono"
+            />
+            <button type="submit" className="btn-neon">{editingSummaryId ? 'Update Summary' : 'Save Summary'}</button>
+          </div>
+          <textarea
+            value={summaryData.summary}
+            onChange={e => setSummaryData(prev => ({ ...prev, summary: e.target.value }))}
+            placeholder="What did you accomplish today? Topics covered, problems solved..."
+            className="input-void w-full h-24 resize-none font-mono text-sm"
+          />
+        </form>
+
+        <div className="space-y-3 max-h-[300px] overflow-y-auto">
+          {data.dailySummaries && data.dailySummaries.length > 0 ? (
+            data.dailySummaries.slice(0, 20).map((s) => (
+              <div key={s.id} className="p-4 rounded-lg bg-[var(--void-surface)] border border-[var(--border-subtle)]">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-mono text-[var(--neon-cyan)]">{s.date}</span>
+                  <div className="flex gap-1">
+                    {updateDailySummary && (
+                      <button onClick={() => { setEditingSummaryId(s.id); setSummaryData({ date: s.date, summary: s.summary }) }} className="p-1 rounded hover:bg-[var(--void-elevated)]" title="Edit">
+                        <Edit2 className="w-3 h-3 text-[var(--neon-purple)]" />
+                      </button>
+                    )}
+                    {deleteDailySummary && (
+                      <button onClick={() => { if (confirm('Delete this summary?')) deleteDailySummary(s.id) }} className="p-1 rounded hover:bg-[var(--neon-red)]/20" title="Delete">
+                        <Trash2 className="w-3 h-3 text-[var(--neon-red)]" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap">{s.summary}</p>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-[var(--text-ghost)]">No daily summaries yet.</p>
+          )}
         </div>
       </div>
     </div>
