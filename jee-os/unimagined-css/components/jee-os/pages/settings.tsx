@@ -35,7 +35,7 @@ export function SettingsPage({
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleGoalSubmit = (e: React.FormEvent) => {
+  const handleGoalSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     updateDailyGoal(dailyGoalInput)
   }

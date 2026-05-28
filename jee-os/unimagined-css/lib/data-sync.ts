@@ -13,19 +13,20 @@ export interface SyncedData {
 const CURRENT_VERSION = 1
 
 /**
- * Save data to Firestore
+ * Save data to Firestore (only called on explicit save actions)
  */
-export async function saveToFirestore(userId: string, data: AppData): Promise<void> {
+export async function saveToFirestore(userId: string, data: AppData, operation: string): Promise<void> {
   try {
+    console.log(`[Firestore] Saving data for operation: ${operation}`)
     const userDocRef = doc(db, COLLECTION_NAME, userId)
     await setDoc(userDocRef, {
       data,
       lastSyncedAt: serverTimestamp(),
       version: CURRENT_VERSION,
     }, { merge: true })
-    console.log('Data synced to Firestore')
+    console.log(`[Firestore] Data saved successfully for: ${operation}`)
   } catch (error) {
-    console.error('Error saving to Firestore:', error)
+    console.error(`[Firestore] Error saving data for ${operation}:`, error)
     throw error
   }
 }

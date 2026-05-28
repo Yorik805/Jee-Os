@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/jee-os/sidebar'
 import { OverviewPage } from '@/components/jee-os/pages/overview'
@@ -15,7 +15,6 @@ import { db, logout } from '@/lib/firebase'
 import type { AppData, AppSettings, Chapter, DoubtLog, NoteLog, ProgressLog, Subject, TipLog, DailySummary } from '@/lib/jee-os/types'
 
 const COLLECTION_NAME = 'user-data'
-const LOCAL_STORAGE_KEY = 'jee-os-data'
 
 const initialSettings: AppSettings = {
   excludeStep3FromCalculations: false
@@ -43,22 +42,6 @@ const initialData: AppData = {
     lastDate: ''
   },
   settings: initialSettings
-}
-
-const initialChapter: Chapter = {
-  name: '',
-  notes: '',
-  exerciseTotal: 0,
-  step2Total: 0,
-  step3Total: 0,
-  step3Sections: {},
-  exerciseDone: 0,
-  step2Done: 0,
-  step3Done: 0,
-  notesProgress: 0,
-  revisionCount: 0,
-  lastTouched: '',
-  doubts: []
 }
 
 const parseDoubts = (text: string, start: number, end: number): number[] => {
@@ -149,6 +132,22 @@ const normalizeData = (raw: Partial<AppData>): AppData => ({
   }
 })
 
+async function saveToFirestore(userId: string, data: AppData, operation: string) {
+  console.log(`[Firestore] Saving data - Operation: ${operation}`)
+  try {
+    const userDocRef = doc(db, COLLECTION_NAME, userId)
+    await setDoc(userDocRef, {
+      data,
+      lastSyncedAt: serverTimestamp(),
+      version: 1,
+    }, { merge: true })
+    console.log(`[Firestore] Save successful - Operation: ${operation}`)
+  } catch (error) {
+    console.error(`[Firestore] Save failed - Operation: ${operation}`, error)
+    throw error
+  }
+}
+
 export default function JeeOSPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
@@ -156,6 +155,8 @@ export default function JeeOSPage() {
   const [activePage, setActivePage] = useState('overview')
   const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false })
   const [isLoaded, setIsLoaded] = useState(false)
+  const dataRef = useRef<AppData>(initialData)
+  dataRef.current = data
 
   const firebaseEnabled = !!(
     process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
@@ -172,72 +173,29 @@ export default function JeeOSPage() {
   useEffect(() => {
     const loadData = async () => {
       if (!user) {
-        const local = localStorage.getItem(LOCAL_STORAGE_KEY)
-        if (local) {
-          try {
-            const parsed = JSON.parse(local)
-            setData(normalizeData(parsed))
-          } catch {
-            setData(initialData)
-          }
-        } else {
-          setData(initialData)
-        }
+        setData(initialData)
         setIsLoaded(true)
         return
       }
 
-try {
+      console.log('[Firestore] Loading data from cloud')
+      try {
         const userDocRef = doc(db, COLLECTION_NAME, user.uid)
         const docSnap = await getDoc(userDocRef)
 
         if (docSnap.exists()) {
-           const storedData = docSnap.data().data as AppData
-           const normalized = normalizeData(storedData)
-           setData(recalculateChapterProgress(normalized))
-           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(normalized))
-         } else {
-           const local = localStorage.getItem(LOCAL_STORAGE_KEY)
-           if (local) {
-             try {
-               const parsed = JSON.parse(local)
-               const normalized = normalizeData(parsed)
-               setData(recalculateChapterProgress(normalized))
-               await setDoc(userDocRef, {
-                 data: normalized,
-                 lastSyncedAt: serverTimestamp(),
-                 version: 1,
-               })
-               showToast('Data synced from browser backup to cloud')
-             } catch {
-               setData(initialData)
-               await setDoc(userDocRef, {
-                 data: initialData,
-                 lastSyncedAt: serverTimestamp(),
-                 version: 1,
-               })
-             }
-           } else {
-             setData(initialData)
-             await setDoc(userDocRef, {
-               data: initialData,
-               lastSyncedAt: serverTimestamp(),
-               version: 1,
-             })
-           }
-         }
-      } catch (error) {
-        console.error('Error loading data from Firestore:', error)
-        const local = localStorage.getItem(LOCAL_STORAGE_KEY)
-        if (local) {
-          try {
-            const parsed = JSON.parse(local)
-            setData(normalizeData(parsed))
-            showToast('Loaded from browser backup (cloud sync failed)')
-          } catch {
-            setData(initialData)
-          }
+          const storedData = docSnap.data().data as AppData
+          const normalized = normalizeData(storedData)
+          setData(recalculateChapterProgress(normalized))
+          console.log('[Firestore] Data loaded successfully from cloud')
+        } else {
+          setData(initialData)
+          console.log('[Firestore] No data found in cloud, using initial data')
         }
+      } catch (error) {
+        console.error('[Firestore] Error loading data from cloud:', error)
+        setData(initialData)
+        showToast('Failed to load cloud data, using initial state')
       }
 
       setIsLoaded(true)
@@ -245,64 +203,6 @@ try {
 
     loadData()
   }, [user])
-
-  useEffect(() => {
-    if (!isLoaded || !user || !firebaseEnabled) return
-
-    const timeoutId = setTimeout(async () => {
-      try {
-        const userDocRef = doc(db, COLLECTION_NAME, user.uid)
-        await setDoc(userDocRef, {
-          data,
-          lastSyncedAt: serverTimestamp(),
-          version: 1,
-        }, { merge: true })
-      } catch (error) {
-        console.error('Error saving to Firestore:', error)
-      }
-    }, 100)
-
-    return () => clearTimeout(timeoutId)
-  }, [data, isLoaded, user, firebaseEnabled])
-
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data))
-  }, [data])
-
-  useEffect(() => {
-    if (!firebaseEnabled || !user) return
-
-    const flushSave = async () => {
-      try {
-        const userDocRef = doc(db, COLLECTION_NAME, user.uid)
-        await setDoc(userDocRef, {
-          data,
-          lastSyncedAt: serverTimestamp(),
-          version: 1,
-        }, { merge: true })
-      } catch (error) {
-        console.error('Error flushing save on unload:', error)
-      }
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        flushSave()
-      }
-    }
-
-    const handleBeforeUnload = () => {
-      flushSave()
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('beforeunload', handleBeforeUnload)
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
-  }, [data, firebaseEnabled, user])
 
   const showToast = useCallback((message: string) => {
     setToast({ message, show: true })
@@ -319,15 +219,21 @@ try {
   }, [router])
 
   const addChapter = useCallback((subject: Subject, chapter: Chapter) => {
-    setData(prev => ({
-      ...prev,
-      subjects: {
-        ...prev.subjects,
-        [subject]: [...prev.subjects[subject], chapter]
+    setData(prev => {
+      const newData = {
+        ...prev,
+        subjects: {
+          ...prev.subjects,
+          [subject]: [...prev.subjects[subject], chapter]
+        }
       }
-    }))
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'add-chapter').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast(`Chapter "${chapter.name}" added to ${subject}`)
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const editChapter = useCallback((subject: Subject, oldName: string, updatedChapter: Chapter) => {
     setData(prev => {
@@ -336,39 +242,55 @@ try {
       if (idx >= 0) {
         subjectChapters[idx] = updatedChapter
       }
-      return {
+      const newData = {
         ...prev,
         subjects: {
           ...prev.subjects,
           [subject]: subjectChapters
         }
       }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'edit-chapter').catch(e => console.error(e))
+      }
+      return newData
     })
     showToast(`Chapter updated`)
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const deleteChapter = useCallback((subject: Subject, chapterName: string) => {
-    setData(prev => ({
-      ...prev,
-      subjects: {
-        ...prev.subjects,
-        [subject]: prev.subjects[subject].filter(c => c.name !== chapterName)
-      },
-      progressLogs: prev.progressLogs.filter(l => !(l.subject === subject && l.chapter === chapterName))
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        subjects: {
+          ...prev.subjects,
+          [subject]: prev.subjects[subject].filter(c => c.name !== chapterName)
+        },
+        progressLogs: prev.progressLogs.filter(l => !(l.subject === subject && l.chapter === chapterName))
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'delete-chapter').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast(`Chapter "${chapterName}" deleted`)
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const toggleExcludeStep3 = useCallback((exclude: boolean) => {
-    setData(prev => ({
-      ...prev,
-      settings: {
-        ...(prev.settings || initialSettings),
-        excludeStep3FromCalculations: exclude
+    setData(prev => {
+      const newData = {
+        ...prev,
+        settings: {
+          ...(prev.settings || initialSettings),
+          excludeStep3FromCalculations: exclude
+        }
       }
-    }))
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'toggle-exclude-step3').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast(exclude ? 'Step 3 excluded from calculations' : 'Step 3 included in calculations')
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const logProgress = useCallback((log: ProgressLog) => {
     if (!log.chapter) {
@@ -433,7 +355,7 @@ try {
         subjectChapters[chapterIdx] = chapter
       }
 
-      return {
+      const newData = {
         ...prev,
         progressLogs: [normalizedLog, ...prev.progressLogs],
         streakData: newStreakData,
@@ -442,10 +364,14 @@ try {
           [normalizedLog.subject]: subjectChapters
         }
       }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'log-progress').catch(e => console.error(e))
+      }
+      return newData
     })
     showToast('Progress logged successfully!')
     return true
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const addTipLog = useCallback((tip: TipLog) => {
     if (!tip.chapter) {
@@ -456,13 +382,19 @@ try {
       showToast('Tip prompt cannot be empty')
       return false
     }
-    setData(prev => ({
-      ...prev,
-      tipLogs: [tip, ...prev.tipLogs]
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        tipLogs: [tip, ...prev.tipLogs]
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'add-tip').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast('Tip saved')
     return true
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const addNoteLog = useCallback((note: NoteLog) => {
     if (!note.chapter) {
@@ -480,7 +412,7 @@ try {
           lastTouched: note.date
         }
       }
-      return {
+      const newData = {
         ...prev,
         noteLogs: [{ ...note, notesProgress: safeProgress }, ...prev.noteLogs],
         subjects: {
@@ -488,132 +420,220 @@ try {
           [note.subject]: subjectChapters
         }
       }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'add-note').catch(e => console.error(e))
+      }
+      return newData
     })
     showToast('Note progress saved')
     return true
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const addDoubtLog = useCallback((doubt: DoubtLog) => {
     if (!doubt.chapter) {
       showToast('Please select a chapter for doubt log')
       return false
     }
-    setData(prev => ({
-      ...prev,
-      doubtLogs: [doubt, ...prev.doubtLogs]
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        doubtLogs: [doubt, ...prev.doubtLogs]
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'add-doubt').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast(doubt.resolved ? 'Hard question logged' : 'Doubt logged')
     return true
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const addDailySummary = useCallback((summary: DailySummary) => {
     if (!summary.summary.trim()) {
       showToast('Summary cannot be empty')
       return false
     }
-    setData(prev => ({
-      ...prev,
-      dailySummaries: [summary, ...prev.dailySummaries]
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        dailySummaries: [summary, ...prev.dailySummaries]
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'add-summary').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast('Daily summary saved')
     return true
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const updateDailySummary = useCallback((summary: DailySummary) => {
-    setData(prev => ({
-      ...prev,
-      dailySummaries: prev.dailySummaries.map(s => s.id === summary.id ? summary : s)
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        dailySummaries: prev.dailySummaries.map(s => s.id === summary.id ? summary : s)
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'update-summary').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast('Summary updated')
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const deleteDailySummary = useCallback((summaryId: string) => {
-    setData(prev => ({
-      ...prev,
-      dailySummaries: prev.dailySummaries.filter(s => s.id !== summaryId)
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        dailySummaries: prev.dailySummaries.filter(s => s.id !== summaryId)
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'delete-summary').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast('Summary deleted')
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const updateProgressLog = useCallback((log: ProgressLog) => {
-    setData(prev => ({
-      ...prev,
-      progressLogs: prev.progressLogs.map(l => l.id === log.id ? log : l)
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        progressLogs: prev.progressLogs.map(l => l.id === log.id ? log : l)
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'update-progress-log').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast('Progress log updated')
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const deleteProgressLog = useCallback((logId: string) => {
-    setData(prev => ({
-      ...prev,
-      progressLogs: prev.progressLogs.filter(l => l.id !== logId)
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        progressLogs: prev.progressLogs.filter(l => l.id !== logId)
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'delete-progress-log').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast('Progress log deleted')
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const updateTipLog = useCallback((tip: TipLog) => {
-    setData(prev => ({
-      ...prev,
-      tipLogs: prev.tipLogs.map(t => t.id === tip.id ? tip : t)
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        tipLogs: prev.tipLogs.map(t => t.id === tip.id ? tip : t)
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'update-tip').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast('Tip updated')
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const deleteTipLog = useCallback((tipId: string) => {
-    setData(prev => ({
-      ...prev,
-      tipLogs: prev.tipLogs.filter(t => t.id !== tipId)
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        tipLogs: prev.tipLogs.filter(t => t.id !== tipId)
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'delete-tip').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast('Tip deleted')
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const updateNoteLog = useCallback((note: NoteLog) => {
-    setData(prev => ({
-      ...prev,
-      noteLogs: prev.noteLogs.map(n => n.id === note.id ? note : n)
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        noteLogs: prev.noteLogs.map(n => n.id === note.id ? note : n)
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'update-note').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast('Note updated')
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const deleteNoteLog = useCallback((noteId: string) => {
-    setData(prev => ({
-      ...prev,
-      noteLogs: prev.noteLogs.filter(n => n.id !== noteId)
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        noteLogs: prev.noteLogs.filter(n => n.id !== noteId)
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'delete-note').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast('Note deleted')
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const updateDoubtLog = useCallback((doubt: DoubtLog) => {
-    setData(prev => ({
-      ...prev,
-      doubtLogs: prev.doubtLogs.map(d => d.id === doubt.id ? doubt : d)
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        doubtLogs: prev.doubtLogs.map(d => d.id === doubt.id ? doubt : d)
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'update-doubt').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast('Doubt log updated')
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const deleteDoubtLog = useCallback((doubtId: string) => {
-    setData(prev => ({
-      ...prev,
-      doubtLogs: prev.doubtLogs.filter(d => d.id !== doubtId)
-    }))
+    setData(prev => {
+      const newData = {
+        ...prev,
+        doubtLogs: prev.doubtLogs.filter(d => d.id !== doubtId)
+      }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'delete-doubt').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast('Doubt log deleted')
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const updateSchoolProgress = useCallback((subject: Subject, chapter: string, index: number) => {
-    setData(prev => ({
-      ...prev,
-      schoolProgress: {
-        ...prev.schoolProgress,
-        [subject]: { chapter, index }
+    setData(prev => {
+      const newData = {
+        ...prev,
+        schoolProgress: {
+          ...prev.schoolProgress,
+          [subject]: { chapter, index }
+        }
       }
-    }))
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'update-school-progress').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast(`School progress updated for ${subject}`)
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const updateDailyGoal = useCallback((goal: number) => {
-    setData(prev => ({ ...prev, dailyGoal: goal }))
+    setData(prev => {
+      const newData = { ...prev, dailyGoal: goal }
+      if (user && firebaseEnabled) {
+        saveToFirestore(user.uid, newData, 'update-daily-goal').catch(e => console.error(e))
+      }
+      return newData
+    })
     showToast(`Daily goal set to ${goal} questions`)
-  }, [showToast])
+  }, [user, firebaseEnabled, showToast])
 
   const exportData = useCallback(() => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -635,12 +655,7 @@ try {
       
       if (user && firebaseEnabled) {
         try {
-          const userDocRef = doc(db, COLLECTION_NAME, user.uid)
-          await setDoc(userDocRef, {
-            data: recalculated,
-            lastSyncedAt: serverTimestamp(),
-            version: 1,
-          }, { merge: true })
+          await saveToFirestore(user.uid, recalculated, 'import')
           showToast('Data imported and saved to cloud!')
         } catch (error) {
           console.error('Error saving imported data:', error)
@@ -657,16 +672,10 @@ try {
   const resetData = useCallback(async () => {
     if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
       setData(initialData)
-      localStorage.removeItem(LOCAL_STORAGE_KEY)
       
       if (user && firebaseEnabled) {
         try {
-          const userDocRef = doc(db, COLLECTION_NAME, user.uid)
-          await setDoc(userDocRef, {
-            data: initialData,
-            lastSyncedAt: serverTimestamp(),
-            version: 1,
-          })
+          await saveToFirestore(user.uid, initialData, 'reset')
         } catch (error) {
           console.error('Error resetting data in Firestore:', error)
         }
